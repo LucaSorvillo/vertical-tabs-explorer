@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vertical Tabs for File Explorer</title>
+<meta name="description" content="Chrome-style vertical tabs for Windows 11 File Explorer, a folders bar with groups like Chrome's bookmarks bar, session restore, tab colors and Ctrl+Shift+T. Free and open source.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Vertical Tabs for File Explorer">
+<meta property="og:description" content="Vertical tabs, a Chrome-like folders bar with groups and session restore for Windows 11 File Explorer.">
+<meta property="og:url" content="https://lucasorvillo.github.io/vertical-tabs-explorer/">
+<meta property="og:image" content="https://lucasorvillo.github.io/vertical-tabs-explorer/assets/explorer-hero.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#202020" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3f3f3" media="(prefers-color-scheme: light)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23202020'/%3E%3Crect x='5' y='6' width='13' height='5' rx='1.5' fill='%23ffc83d'/%3E%3Crect x='5' y='13.5' width='13' height='5' rx='1.5' fill='%23fff' fill-opacity='.4'/%3E%3Crect x='5' y='21' width='13' height='5' rx='1.5' fill='%23fff' fill-opacity='.4'/%3E%3Crect x='20.5' y='6' width='6.5' height='20' rx='1.5' fill='%23fff' fill-opacity='.14'/%3E%3C/svg%3E">
+<script>
+(function () {
+  var d = document.documentElement, l = null, c = null;
+  try { l = new URLSearchParams(location.search).get('lang') || localStorage.getItem('vt-lang'); c = localStorage.getItem('vt-collapsed'); } catch (e) {}
+  if (l !== 'it' && l !== 'en') l = /^it\b/i.test(navigator.language || '') ? 'it' : 'en';
+  d.lang = l; d.setAttribute('data-lang', l);
+  d.setAttribute('data-collapsed', String(window.matchMedia('(max-width: 760px)').matches || c === 'true'));
+})();
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="folder" viewBox="0 0 20 20"><path d="M2 5.6A1.6 1.6 0 0 1 3.6 4h3.9c.45 0 .87.18 1.17.5L10 5.9h6.4A1.6 1.6 0 0 1 18 7.5v7A1.6 1.6 0 0 1 16.4 16H3.6A1.6 1.6 0 0 1 2 14.4z" fill="#e3a23b"/><path d="M2 8.2h16v6.2a1.6 1.6 0 0 1-1.6 1.6H3.6A1.6 1.6 0 0 1 2 14.4z" fill="#ffc83d"/></symbol>
+</svg>
+<a class="skip" href="#overview"><span lang="en">Skip to content</span><span lang="it">Vai al contenuto</span></a>
+<div class="app">
+
+<nav class="column" aria-label="Sections">
+  <div class="column-top">
+    <button class="icon-button collapse" type="button" aria-expanded="true" aria-controls="tabs">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><path d="M5.5 2.5v11"/><path d="M11 6 9 8l2 2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="sr"><span lang="en">Collapse or expand the tabs</span><span lang="it">Comprimi o espandi le schede</span></span>
+    </button>
+  </div>
+  <ul class="tabs" id="tabs">
+    <li><a class="tab" href="#overview"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Overview</span><span lang="it">Panoramica</span></span></a></li>
+    <li><a class="tab" href="#vertical-tabs" data-color="blue"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Vertical tabs</span><span lang="it">Schede verticali</span></span></a></li>
+    <li><a class="tab" href="#folders-bar" data-color="purple"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Folders bar and groups</span><span lang="it">Barra delle cartelle e gruppi</span></span></a></li>
+    <li><a class="tab" href="#session" data-color="green"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Windows that come back</span><span lang="it">Finestre che tornano</span></span></a></li>
+    <li><a class="tab" href="#reopen" data-color="orange"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Reopen closed tabs</span><span lang="it">Riapri le schede chiuse</span></span></a></li>
+    <li><a class="tab" href="#open-in-tabs" data-color="cyan"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Folders in tabs</span><span lang="it">Cartelle in una scheda</span></span></a></li>
+    <li><a class="tab" href="#back-to-top" data-color="yellow"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Back to top</span><span lang="it">Torna su</span></span></a></li>
+    <li><a class="tab" href="#install"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Install</span><span lang="it">Installazione</span></span></a></li>
+    <li><a class="tab" href="#options"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Options</span><span lang="it">Opzioni</span></span></a></li>
+    <li><a class="tab" href="#safety"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Safety and privacy</span><span lang="it">Sicurezza e privacy</span></span></a></li>
+    <li><a class="tab" href="#faq"><span class="tab-icon"><svg aria-hidden="true"><use href="#folder"/></svg></span><span class="tab-label"><span lang="en">Questions</span><span lang="it">Domande</span></span></a></li>
+  </ul>
+  <a class="newtab" href="https://lucasorvillo.github.io/vertical-tabs-notepad/" title="Vertical Tabs for Notepad">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11"/></svg>
+    <span class="newtab-label"><span lang="en">Notepad version</span><span lang="it">Versione per il Blocco note</span></span>
+  </a>
+</nav>
+
+<main class="content">
+  <div class="bar">
+    <span class="bar-name">Vertical Tabs for File Explorer</span>
+    <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">Download</a>
+    <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer">GitHub</a>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-set-lang="en" aria-pressed="true">English</button>
+      <button type="button" data-set-lang="it" aria-pressed="false">Italiano</button>
+    </div>
+  </div>
+
+  <section id="overview" class="hero">
+    <h1>Vertical Tabs for File Explorer</h1>
+    <p class="lead" lang="en">File Explorer tabs in a column on the left, a folders bar like Chrome's bookmarks bar, and windows that come back when you reopen File Explorer.</p>
+    <p class="lead" lang="it">Le schede di Esplora file in una colonna a sinistra, una barra delle cartelle come la barra dei segnalibri di Chrome, e finestre che tornano quando riapri Esplora file.</p>
+    <div class="actions">
+      <a class="button primary" href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2v8M4.5 6.8 8 10.3l3.5-3.5M3 13.5h10"/></svg>
+        <span lang="en">Download for Windows 11</span><span lang="it">Scarica per Windows 11</span>
+      </a>
+      <a class="button" href="https://github.com/LucaSorvillo/vertical-tabs-explorer"><span lang="en">Source code on GitHub</span><span lang="it">Codice sorgente su GitHub</span></a>
+    </div>
+    <p class="muted" lang="en">Free and open source, MIT license. Windows 11 22H2 or later, 64-bit. Version 1.0.0.</p>
+    <p class="muted" lang="it">Gratis e open source, licenza MIT. Windows 11 22H2 o successivo, a 64 bit. Versione 1.0.0.</p>
+    <figure>
+      <img class="shot" src="assets/explorer-hero.png" width="1484" height="892" alt="File Explorer with its tabs in a column on the left and a bar of folders and groups at the top, showing a folder of photos">
+    </figure>
+  </section>
+
+  <section id="vertical-tabs">
+    <h2 data-color="blue"><span lang="en">Vertical tabs</span><span lang="it">Schede verticali</span></h2>
+    <div class="prose">
+      <p lang="en">The tabs move into a column that starts at the top of the window. The empty title row is hidden: the address bar moves up next to the window buttons, and the address and command bars take the color of the title bar, so the folder sits in a single frame. Under the hood they are still File Explorer's own tabs.</p>
+      <p lang="it">Le schede si spostano in una colonna che parte dalla cima della finestra. La riga del titolo, rimasta vuota, si nasconde: la barra degli indirizzi sale accanto ai pulsanti della finestra, e la barra degli indirizzi e quella dei comandi prendono il colore della barra del titolo, così la cartella sta in un'unica cornice. Sotto restano le schede di Esplora file.</p>
+      <ul lang="en">
+        <li>Click to switch, middle-click or × to close, + for a new tab.</li>
+        <li>Drag a tab to reorder it: File Explorer's real tabs move too.</li>
+        <li>Right-click for File Explorer's own tab menu, plus <strong>Tab color</strong>, with the colors of Chrome's tab groups.</li>
+        <li>A color belongs to the tab: it follows the tab to other folders and comes back with the session.</li>
+        <li>Collapse the column to icons, or drag its edge to resize it. Width and state apply to every window.</li>
+      </ul>
+      <ul lang="it">
+        <li>Clic per cambiare scheda, clic centrale o × per chiudere, + per una scheda nuova.</li>
+        <li>Trascina una scheda per spostarla: si spostano anche le schede vere di Esplora file.</li>
+        <li>Clic destro per il menu della scheda di Esplora file, più <strong>Colore scheda</strong>, con i colori dei gruppi di schede di Chrome.</li>
+        <li>Il colore appartiene alla scheda: la segue nelle altre cartelle e torna con la sessione.</li>
+        <li>Comprimi la colonna in sole icone, o trascinane il bordo per allargarla. Larghezza e stato valgono per tutte le finestre.</li>
+      </ul>
+    </div>
+    <figure>
+      <img class="shot" src="assets/explorer-tabs.gif" width="960" height="575" loading="lazy" decoding="async" alt="Recording: clicking through the Photos, Travel and Website redesign tabs, then dragging Downloads above Reports">
+      <figcaption><span lang="en">Switching tabs, then dragging Downloads above Reports.</span><span lang="it">Cambio di scheda, poi Downloads trascinata sopra Reports.</span></figcaption>
+    </figure>
+    <figure>
+      <img class="shot" src="assets/explorer-tab-color.png" width="1480" height="886" loading="lazy" decoding="async" alt="The tab menu of File Explorer with the Tab color submenu open, listing the nine colors">
+      <figcaption><span lang="en">"Colore scheda" (Tab color) at the end of File Explorer's own tab menu.</span><span lang="it">"Colore scheda" in fondo al menu della scheda di Esplora file.</span></figcaption>
+    </figure>
+    <figure>
+      <img class="shot" src="assets/explorer-collapse.gif" width="960" height="575" loading="lazy" decoding="async" alt="Recording: the column collapses to folder icons, then expands again">
+      <figcaption><span lang="en">Collapsed, the column keeps only the icons.</span><span lang="it">Da compressa, la colonna tiene solo le icone.</span></figcaption>
+    </figure>
+  </section>
+
+  <section id="folders-bar">
+    <h2 data-color="purple"><span lang="en">Folders bar and groups</span><span lang="it">Barra delle cartelle e gruppi</span></h2>
+    <div class="prose">
+      <p lang="en">The navigation pane becomes a bar under the command bar, like Chrome's bookmarks bar: Home, Gallery, your Quick Access folders, This PC and Network, in the same order and with the same icons. It works with or without the vertical tabs.</p>
+      <p lang="it">Il riquadro di spostamento diventa una barra sotto la barra dei comandi, come la barra dei segnalibri di Chrome: Home, Galleria, le cartelle di Accesso rapido, Questo PC e Rete, nello stesso ordine e con le stesse icone. Funziona con o senza le schede verticali.</p>
+      <ul lang="en">
+        <li>Click opens a folder in the current tab, middle-click in a new tab.</li>
+        <li>Right-click shows the Windows 11 context menu, the same one as the navigation pane.</li>
+        <li>Drag your Quick Access folders to reorder them: Windows uses the same order in the navigation pane, in Home and in the taskbar menu.</li>
+        <li>Items that don't fit go into the » list.</li>
+      </ul>
+      <ul lang="it">
+        <li>Il clic apre la cartella nella scheda attuale, il clic centrale in una scheda nuova.</li>
+        <li>Il clic destro mostra il menu di Windows 11, lo stesso del riquadro di spostamento.</li>
+        <li>Trascina le cartelle di Accesso rapido per riordinarle: Windows usa lo stesso ordine nel riquadro di spostamento, nella Home e nel menu della barra delle applicazioni.</li>
+        <li>Le voci che non ci stanno finiscono nell'elenco ».</li>
+      </ul>
+      <p lang="en"><strong>Groups</strong> work like Chrome's bookmark folders: a group collects folders and other groups. Click it to open its list. Once a list is open, hovering another group switches to it at once. Middle-click opens all the folders of a group in new tabs. Groups exist only in the bar: your folders stay in Quick Access.</p>
+      <p lang="it">I <strong>gruppi</strong> funzionano come le cartelle dei segnalibri di Chrome: un gruppo raccoglie cartelle e altri gruppi. Un clic apre il suo elenco. Con un elenco aperto, passando su un altro gruppo si apre subito il suo. Il clic centrale apre tutte le cartelle del gruppo in schede nuove. I gruppi esistono solo nella barra: le cartelle restano in Accesso rapido.</p>
+    </div>
+    <figure>
+      <img class="shot" src="assets/explorer-groups.gif" width="960" height="575" loading="lazy" decoding="async" alt="Recording: clicking the Work group, moving to Personal and back, opening the Clients subgroup and clicking Fabrikam">
+      <figcaption><span lang="en">Opening Work, moving to Personal and back, then the Clients subgroup.</span><span lang="it">Work aperto, il passaggio a Personal e ritorno, poi il sottogruppo Clients.</span></figcaption>
+    </figure>
+    <figure>
+      <img class="shot" src="assets/explorer-groups.png" width="1484" height="892" loading="lazy" decoding="async" alt="The Work group open under the bar, with its Clients subgroup open beside it">
+      <figcaption><span lang="en">A group with a subgroup open beside it.</span><span lang="it">Un gruppo con un sottogruppo aperto accanto.</span></figcaption>
+    </figure>
+    <div class="prose">
+      <p lang="en">To put a folder into a group, drag it onto the group and wait a moment: the group opens, and you can drop the folder exactly where you want it. This works from the bar, from a group's list and from one group to another.</p>
+      <p lang="it">Per mettere una cartella in un gruppo, trascinala sul gruppo e aspetta un attimo: il gruppo si apre, e puoi lasciare la cartella esattamente dove vuoi. Vale dalla barra, dall'elenco di un gruppo e da un gruppo all'altro.</p>
+    </div>
+    <figure>
+      <img class="shot" src="assets/explorer-drag-group.gif" width="960" height="575" loading="lazy" decoding="async" alt="Recording: dragging Downloads from the bar onto the Personal group, which opens; Downloads is dropped between Travel and Recipes">
+      <figcaption><span lang="en">Downloads dragged onto Personal and dropped between Travel and Recipes.</span><span lang="it">Downloads trascinata su Personal e lasciata tra Travel e Recipes.</span></figcaption>
+    </figure>
+    <figure>
+      <img class="shot small" src="assets/explorer-context-menu.png" width="912" height="490" loading="lazy" decoding="async" alt="The Windows 11 context menu opened on the Downloads folder of the bar">
+      <figcaption><span lang="en">Right-click on a folder of the bar: the Windows 11 menu.</span><span lang="it">Clic destro su una cartella della barra: il menu di Windows 11.</span></figcaption>
+    </figure>
+  </section>
+
+  <section id="session">
+    <h2 data-color="green"><span lang="en">Windows that come back</span><span lang="it">Finestre che tornano</span></h2>
+    <div class="prose">
+      <p lang="en">File Explorer forgets everything when you close it or restart the PC. The app remembers every window, its tabs in order, the active tab, the tab colors, the position and the size, and brings them back when you open File Explorer again.</p>
+      <p lang="it">Esplora file dimentica tutto quando lo chiudi o riavvii il PC. L'app ricorda ogni finestra, le sue schede in ordine, la scheda attiva, i colori delle schede, la posizione e la dimensione, e le riporta quando riapri Esplora file.</p>
+      <p lang="en">Each window appears complete: it stays invisible while its tabs are rebuilt, then shows up all at once. If another app opened File Explorer on a specific folder, that folder stays in front and the session's tabs are added next to it. Folders that no longer exist are skipped.</p>
+      <p lang="it">Ogni finestra compare già completa: resta invisibile mentre le sue schede si ricostruiscono, poi appare tutta insieme. Se un altro programma ha aperto Esplora file su una cartella precisa, quella resta davanti e le schede della sessione si aggiungono accanto. Le cartelle che non esistono più vengono saltate.</p>
+    </div>
+  </section>
+
+  <section id="reopen">
+    <h2 data-color="orange"><span lang="en">Reopen closed tabs</span><span lang="it">Riapri le schede chiuse</span></h2>
+    <div class="prose">
+      <p lang="en">Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> to bring back the tab you just closed, as the active tab at the end of the list. If you closed a whole window, the whole window comes back with all its tabs. Press again to go further back, up to 25 times, even after a restart.</p>
+      <p lang="it">Premi <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>T</kbd> per riavere la scheda appena chiusa, come scheda attiva in fondo all'elenco. Se hai chiuso un'intera finestra, torna tutta la finestra con le sue schede. Premendo di nuovo vai a ritroso, fino a 25 volte, anche dopo un riavvio.</p>
+    </div>
+    <figure>
+      <img class="shot" src="assets/explorer-reopen.gif" width="960" height="575" loading="lazy" decoding="async" alt="Recording: the Travel tab is closed with its close button, then comes back, orange, at the end of the list">
+      <figcaption><span lang="en">Travel, closed with × and brought back with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>, color included.</span><span lang="it">Travel, chiusa con × e riportata con <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>T</kbd>, colore compreso.</span></figcaption>
+    </figure>
+  </section>
+
+  <section id="open-in-tabs">
+    <h2 data-color="cyan"><span lang="en">Folders from other apps open in a tab</span><span lang="it">Le cartelle degli altri programmi in una scheda</span></h2>
+    <div class="prose">
+      <p lang="en">When another app opens a folder while File Explorer is open (a "Show in folder" button, a desktop shortcut, Start search), the folder arrives as a new tab of the window you used last, like links in Chrome. If the app wanted to show a file, the file is selected. <kbd>Ctrl</kbd>+<kbd>N</kbd>, "Open in new window" and <kbd>Win</kbd>+<kbd>E</kbd> still open new windows.</p>
+      <p lang="it">Quando un altro programma apre una cartella mentre Esplora file è aperto (un pulsante "Mostra nella cartella", un collegamento sul desktop, la ricerca di Start), la cartella arriva in una scheda nuova della finestra usata per ultima, come i link in Chrome. Se il programma voleva mostrare un file, il file è selezionato. <kbd>Ctrl</kbd>+<kbd>N</kbd>, "Apri in una nuova finestra" e <kbd>Win</kbd>+<kbd>E</kbd> aprono comunque finestre nuove.</p>
+    </div>
+  </section>
+
+  <section id="back-to-top">
+    <h2 data-color="yellow"><span lang="en">Back to top</span><span lang="it">Torna su</span></h2>
+    <div class="prose">
+      <p lang="en">Scroll down a long folder and a round button fades in at the bottom right. One click goes back to the top, without taking the focus away from File Explorer.</p>
+      <p lang="it">Scorri una cartella lunga e in basso a destra compare sfumando un pulsante tondo. Un clic torna all'inizio, senza togliere il fuoco a Esplora file.</p>
+    </div>
+    <figure>
+      <img class="shot" src="assets/explorer-back-to-top.gif" width="960" height="575" loading="lazy" decoding="async" alt="Recording: scrolling down a folder with 240 files, the round button appears, one click scrolls back to the top">
+    </figure>
+  </section>
+
+  <section id="install">
+    <h2><span lang="en">Install</span><span lang="it">Installazione</span></h2>
+    <ol class="steps" lang="en">
+      <li>Download <code>VTabsExplorer-1.0.0-setup.exe</code> from the <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">latest release</a>.</li>
+      <li>Run it. No administrator rights needed: it installs for your user only, in English or Italian. It asks whether to start with Windows and whether to turn on the vertical tabs and the folders bar.</li>
+      <li>That's it: the app runs in the notification area, and the open File Explorer windows get the new tabs right away.</li>
+    </ol>
+    <ol class="steps" lang="it">
+      <li>Scarica <code>VTabsExplorer-1.0.0-setup.exe</code> dall'<a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">ultima release</a>.</li>
+      <li>Avvialo. Non servono diritti di amministratore: si installa solo per il tuo utente, in italiano o in inglese. Chiede se avviarsi con Windows e se attivare le schede verticali e la barra delle cartelle.</li>
+      <li>Fatto: l'app resta nell'area di notifica, e le finestre di Esplora file aperte prendono subito le nuove schede.</li>
+    </ol>
+    <p class="callout" lang="en">The installer isn't code-signed, so SmartScreen may say "Windows protected your PC": choose <strong>More info</strong> › <strong>Run anyway</strong>. For the vertical tabs and the folders bar the app loads a module into File Explorer, which some security software flags. The source code is public, and you can build it yourself.</p>
+    <p class="callout" lang="it">L'installer non ha una firma digitale, quindi SmartScreen può dire "PC protetto da Windows": scegli <strong>Ulteriori informazioni</strong> › <strong>Esegui comunque</strong>. Per le schede verticali e la barra delle cartelle l'app carica un modulo dentro Esplora file, e qualche antivirus lo segnala. Il codice sorgente è pubblico, e puoi compilarlo da te.</p>
+    <h3><span lang="en">Requirements</span><span lang="it">Requisiti</span></h3>
+    <div class="prose">
+      <ul lang="en">
+        <li>Windows 11 22H2 or later, 64-bit: the File Explorer with tabs.</li>
+        <li>Tested on Windows 11 26H2 (build 26300). A Windows update can break the vertical tabs or the folders bar: if that happens, turn them off from the tray menu.</li>
+      </ul>
+      <ul lang="it">
+        <li>Windows 11 22H2 o successivo, a 64 bit: l'Esplora file con le schede.</li>
+        <li>Provato su Windows 11 26H2 (build 26300). Un aggiornamento di Windows può rompere le schede verticali o la barra delle cartelle: in quel caso spegnile dal menu della tray.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="options">
+    <h2><span lang="en">Options</span><span lang="it">Opzioni</span></h2>
+    <div class="prose">
+      <p lang="en">Right-click the icon in the notification area. The menu is in Italian:</p>
+      <p lang="it">Clic destro sull'icona nell'area di notifica:</p>
+    </div>
+    <figure>
+      <img class="shot small" src="assets/explorer-tray-menu.png" width="538" height="330" loading="lazy" decoding="async" alt="The tray menu of the app, with the options listed below">
+    </figure>
+    <div class="table-wrap">
+      <table lang="en">
+        <thead><tr><th scope="col">Menu item</th><th scope="col">Meaning</th><th scope="col">Default</th></tr></thead>
+        <tbody>
+          <tr><td>Riapri le cartelle all'apertura di Esplora file</td><td>Reopen your folders when File Explorer opens</td><td>On</td></tr>
+          <tr><td>Riapri ora l'ultima sessione</td><td>Reopen the last session now</td><td></td></tr>
+          <tr><td>Pulsante «Torna su» nella vista dei file</td><td>Back-to-top button</td><td>On</td></tr>
+          <tr><td>Riapri la scheda chiusa con Ctrl+Maiusc+T</td><td>Reopen closed tabs with Ctrl+Shift+T</td><td>On</td></tr>
+          <tr><td>Cartelle aperte da altri programmi in una scheda (come Chrome)</td><td>Folders from other apps open in a tab</td><td>On</td></tr>
+          <tr><td>Schede verticali (colonna a sinistra)</td><td>Vertical tabs</td><td>Chosen in the setup</td></tr>
+          <tr><td>Riquadro di spostamento in alto (barra delle cartelle)</td><td>Folders bar</td><td>Chosen in the setup</td></tr>
+          <tr><td>Avvia con Windows</td><td>Start with Windows</td><td>Chosen in the setup</td></tr>
+          <tr><td>Apri cartella impostazioni e log</td><td>Open the settings and log folder</td><td></td></tr>
+          <tr><td>Esci</td><td>Exit</td><td></td></tr>
+        </tbody>
+      </table>
+      <table lang="it">
+        <thead><tr><th scope="col">Voce del menu</th><th scope="col">Predefinito</th></tr></thead>
+        <tbody>
+          <tr><td>Riapri le cartelle all'apertura di Esplora file</td><td>Attiva</td></tr>
+          <tr><td>Riapri ora l'ultima sessione</td><td></td></tr>
+          <tr><td>Pulsante «Torna su» nella vista dei file</td><td>Attiva</td></tr>
+          <tr><td>Riapri la scheda chiusa con Ctrl+Maiusc+T</td><td>Attiva</td></tr>
+          <tr><td>Cartelle aperte da altri programmi in una scheda (come Chrome)</td><td>Attiva</td></tr>
+          <tr><td>Schede verticali (colonna a sinistra)</td><td>Scelta nell'installazione</td></tr>
+          <tr><td>Riquadro di spostamento in alto (barra delle cartelle)</td><td>Scelta nell'installazione</td></tr>
+          <tr><td>Avvia con Windows</td><td>Scelta nell'installazione</td></tr>
+          <tr><td>Apri cartella impostazioni e log</td><td></td></tr>
+          <tr><td>Esci</td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="safety">
+    <h2><span lang="en">Safety and privacy</span><span lang="it">Sicurezza e privacy</span></h2>
+    <div class="prose">
+      <p lang="en">The vertical tabs and the folders bar run inside <code>explorer.exe</code>, which also hosts the taskbar and the desktop. The app watches it: if File Explorer crashes with the module loaded, both features are suspended at once and stay off until you turn them on again from the tray menu. The other features don't load anything into File Explorer.</p>
+      <p lang="it">Le schede verticali e la barra delle cartelle lavorano dentro <code>explorer.exe</code>, che ospita anche la barra delle applicazioni e il desktop. L'app lo sorveglia: se Esplora file si chiude per un errore con il modulo caricato, le due funzioni vengono sospese subito e restano spente finché non le riattivi dal menu della tray. Le altre funzioni non caricano nulla dentro Esplora file.</p>
+      <ul lang="en">
+        <li>The app works offline: no network access, no telemetry, no account.</li>
+        <li>It never reads the content of your files. It stores folder paths, because it needs them to reopen your windows.</li>
+        <li>Everything stays in <code>%LOCALAPPDATA%\VTabsExplorer</code>: the options, the last session, the closed tabs, the groups and the logs. The logs contain folder paths: have a look before sharing them.</li>
+      </ul>
+      <ul lang="it">
+        <li>L'app funziona offline: niente rete, niente telemetria, nessun account.</li>
+        <li>Non legge mai il contenuto dei file. Salva i percorsi delle cartelle, perché le servono per riaprire le finestre.</li>
+        <li>Tutto resta in <code>%LOCALAPPDATA%\VTabsExplorer</code>: le opzioni, l'ultima sessione, le schede chiuse, i gruppi e i registri. I registri contengono percorsi di cartelle: controllali prima di condividerli.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="faq">
+    <h2><span lang="en">Questions</span><span lang="it">Domande</span></h2>
+    <div class="faq" lang="en">
+      <details><summary>Do I need the vertical tabs for the other features?</summary><div><p>No. Session restore, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>, folders in tabs and the back-to-top button work on their own, from outside File Explorer.</p></div></details>
+      <details><summary>Does it change File Explorer?</summary><div><p>No. Nothing changes on disk. While the app runs, the vertical tabs and the folders bar come from a module loaded into File Explorer. Turn them off and File Explorer's own tab strip and navigation pane come back right away. Uninstall the app, and nothing is loaded after File Explorer restarts.</p></div></details>
+      <details><summary>What happens if File Explorer crashes?</summary><div><p>Windows restarts it as usual. If the module was loaded, the app suspends the vertical tabs and the folders bar and tells you. Your folders come back the next time you open File Explorer.</p></div></details>
+      <details><summary>Why do Windows or my antivirus warn me?</summary><div><p>The installer isn't signed yet, and loading a module into <code>explorer.exe</code> is something security tools watch closely. The code is open: you can read it and build it yourself.</p></div></details>
+      <details><summary>A Windows update broke something.</summary><div><p>File Explorer's interface can change with an update. Turn the feature off from the tray menu, and <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/issues">open an issue</a> with your Windows version (<kbd>Win</kbd>+<kbd>R</kbd>, then <code>winver</code>).</p></div></details>
+      <details><summary>Why does a reopened tab go to the end?</summary><div><p>That's how reopening works for now: the tab comes back as the active one at the end of the list, and you can drag it back into place.</p></div></details>
+      <details><summary>Why is the app's menu in Italian?</summary><div><p>The app was born in Italian. The website and the documentation are in English and Italian.</p></div></details>
+      <details><summary>How do I uninstall it?</summary><div><p><strong>Settings</strong> › <strong>Apps</strong> › <strong>Installed apps</strong> › <strong>Vertical Tabs for File Explorer</strong> › <strong>Uninstall</strong>. The uninstaller asks whether to delete your settings and saved data too. Open windows keep the vertical tabs until File Explorer restarts.</p></div></details>
+    </div>
+    <div class="faq" lang="it">
+      <details><summary>Servono le schede verticali per le altre funzioni?</summary><div><p>No. Ripristino della sessione, <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>T</kbd>, cartelle in una scheda e "Torna su" funzionano da sole, dall'esterno di Esplora file.</p></div></details>
+      <details><summary>Modifica Esplora file?</summary><div><p>No. Su disco non cambia niente. Mentre l'app è aperta, schede verticali e barra delle cartelle vengono da un modulo caricato dentro Esplora file. Spegnile e tornano subito la barra delle schede e il riquadro di spostamento di Esplora file. Disinstalla l'app, e dopo il riavvio di Esplora file non viene caricato più niente.</p></div></details>
+      <details><summary>Cosa succede se Esplora file si chiude per un errore?</summary><div><p>Windows lo riavvia come sempre. Se il modulo era caricato, l'app sospende le schede verticali e la barra delle cartelle e te lo dice. Le cartelle tornano la prossima volta che apri Esplora file.</p></div></details>
+      <details><summary>Perché Windows o l'antivirus mi avvisano?</summary><div><p>L'installer non ha ancora una firma digitale, e caricare un modulo dentro <code>explorer.exe</code> è una cosa che i programmi di sicurezza tengono d'occhio. Il codice è aperto: puoi leggerlo e compilarlo da te.</p></div></details>
+      <details><summary>Un aggiornamento di Windows ha rotto qualcosa.</summary><div><p>Un aggiornamento può cambiare l'interfaccia di Esplora file. Spegni la funzione dal menu della tray e <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/issues">apri una segnalazione</a> con la versione di Windows (<kbd>Win</kbd>+<kbd>R</kbd>, poi <code>winver</code>).</p></div></details>
+      <details><summary>Perché una scheda riaperta va in fondo?</summary><div><p>Per ora la riapertura funziona così: la scheda torna come scheda attiva in fondo all'elenco, e puoi trascinarla al suo posto.</p></div></details>
+      <details><summary>Perché il menu dell'app è in italiano?</summary><div><p>L'app è nata in italiano. Il sito e la documentazione sono in italiano e in inglese.</p></div></details>
+      <details><summary>Come si disinstalla?</summary><div><p><strong>Impostazioni</strong> › <strong>App</strong> › <strong>App installate</strong> › <strong>Vertical Tabs for File Explorer</strong> › <strong>Disinstalla</strong>. La disinstallazione chiede se eliminare anche impostazioni e dati salvati. Le finestre aperte tengono le schede verticali finché Esplora file non si riavvia.</p></div></details>
+    </div>
+  </section>
+
+  <footer>
+    <p lang="en"><a href="https://github.com/LucaSorvillo/vertical-tabs-explorer">Source code</a>, <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases">releases</a>, <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/blob/main/CHANGELOG.md">changelog</a>, <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/blob/main/ARCHITECTURE.md">how it works</a>, <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/issues">report a problem</a>.</p>
+    <p lang="it"><a href="https://github.com/LucaSorvillo/vertical-tabs-explorer">Codice sorgente</a>, <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases">release</a>, <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/blob/main/CHANGELOG.md">novità</a>, <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/blob/main/DESIGN-NOTES.it.md">come funziona</a>, <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/issues">segnala un problema</a>.</p>
+    <p lang="en">Vertical Tabs for File Explorer is free software under the MIT license. It isn't affiliated with or endorsed by Microsoft. Windows and File Explorer are trademarks of Microsoft Corporation.</p>
+    <p lang="it">Vertical Tabs for File Explorer è software libero con licenza MIT. Non è affiliato a Microsoft né approvato da Microsoft. Windows ed Esplora file sono marchi di Microsoft Corporation.</p>
+  </footer>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>
