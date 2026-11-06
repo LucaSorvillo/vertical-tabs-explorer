@@ -20,8 +20,8 @@ Explorer rebuilds the tab strip as a column and the navigation pane as a bar. Un
 File Explorer's own tabs, menus and commands.
 
 > [!NOTE]
-> The app's own texts (tray menu, the "Tab color" menu, the group menus) are in Italian for now. The
-> screenshots show an Italian Windows.
+> The app speaks the language of Windows: Italian if the Windows display language is Italian, English
+> otherwise. The setup does the same.
 
 ## Features
 
@@ -100,8 +100,8 @@ When you open File Explorer again, the windows come back:
   tabs are added next to it.
 
 Each window **appears complete**: it stays invisible while its tabs are built, then shows up all at once
-(about 0.3 s more for each extra tab). Folders that no longer exist are skipped. **Riapri ora l'ultima
-sessione** ("Reopen the last session now") in the tray menu brings everything back on request.
+(about 0.3 s more for each extra tab). Folders that no longer exist are skipped. **Reopen the last session
+now** in the tray menu brings everything back on request.
 
 ### Reopen closed tabs (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>)
 
@@ -142,7 +142,7 @@ back to the top without taking the focus away from File Explorer.
 1. Download `VTabsExplorer-<version>-setup.exe` from the
    [latest release](https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest).
 2. Run it. No administrator rights are needed: it installs into `%LOCALAPPDATA%\Programs\VTabsExplorer`.
-   The setup is in English or Italian. It offers to:
+   Like the app, the setup follows the Windows language (Italian or English). It offers to:
    - start the app with Windows (needed to restore your folders after a restart);
    - turn on the vertical tabs;
    - turn on the folders bar.
@@ -157,22 +157,22 @@ back to the top without taking the focus away from File Explorer.
 
 ## Usage
 
-Everything is in the tray menu (right-click the icon). The items are in Italian:
+Everything is in the tray menu (right-click the icon):
 
 ![Tray menu](docs/assets/explorer-tray-menu.png)
 
-| Menu item | Meaning | Default |
-| --- | --- | --- |
-| Riapri le cartelle all'apertura di Esplora file | Reopen your folders when File Explorer opens | on |
-| Riapri ora l'ultima sessione | Reopen the last session now (when no window is open) | |
-| Pulsante «Torna su» nella vista dei file | Back-to-top button | on |
-| Riapri la scheda chiusa con Ctrl+Maiusc+T | Reopen closed tabs with Ctrl+Shift+T | on |
-| Cartelle aperte da altri programmi in una scheda (come Chrome) | Folders opened by other apps go into a tab | on |
-| Schede verticali (colonna a sinistra) | Vertical tabs | chosen in the setup |
-| Riquadro di spostamento in alto (barra delle cartelle) | Folders bar | chosen in the setup |
-| Avvia con Windows | Start with Windows | chosen in the setup |
-| Apri cartella impostazioni e log | Open the settings and log folder | |
-| Esci | Exit | |
+| Menu item | Default |
+| --- | --- |
+| Reopen your folders when File Explorer opens | on |
+| Reopen the last session now | (when no window is open) |
+| Back-to-top button in the file view | on |
+| Reopen closed tabs with Ctrl+Shift+T | on |
+| Folders opened by other apps go into a tab (like Chrome) | on |
+| Vertical tabs (column on the left) | chosen in the setup |
+| Navigation pane at the top (folders bar) | chosen in the setup |
+| Start with Windows | chosen in the setup |
+| Open settings and log folder | |
+| Exit | |
 
 Turning off the vertical tabs or the folders bar brings back File Explorer's normal tab strip and navigation
 pane right away.
@@ -266,7 +266,6 @@ open keep the vertical tabs until File Explorer restarts (or until you sign out)
   [open an issue](https://github.com/LucaSorvillo/vertical-tabs-explorer/issues) with your Windows version
   (<kbd>Win</kbd>+<kbd>R</kbd> › `winver`).
 - A reopened tab comes back at the end of the tab list, not in its old place.
-- The app's texts are in Italian.
 - x64 only.
 
 ## Related

@@ -293,8 +293,10 @@ namespace xpx
         }
         else if (m_notify)
         {
-            m_notify(L"Esplora file si è chiuso in modo anomalo mentre erano attive le schede verticali: le ho sospese per sicurezza. "
-                     L"Puoi riattivarle dal menu di VTabsExplorer.");
+            m_notify(Tr(L"File Explorer closed unexpectedly while the vertical tabs were on: they are suspended for safety. "
+                        L"You can turn them back on from the VTabsExplorer menu.",
+                        L"Esplora file si è chiuso in modo anomalo mentre erano attive le schede verticali: le ho sospese per sicurezza. "
+                        L"Puoi riattivarle dal menu di VTabsExplorer."));
         }
     }
 }

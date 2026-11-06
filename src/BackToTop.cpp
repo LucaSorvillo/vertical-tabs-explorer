@@ -1,6 +1,7 @@
 #include "BackToTop.h"
 
 #include "Common.h"
+#include "ModShared.h"
 
 #include <commctrl.h>
 #include <objidl.h>
@@ -168,7 +169,7 @@ namespace xpx
         RegisterClassExW(&windowClass);
         // Sempre sopra, mai attiva (il clic lascia il focus a Esplora file), fuori da barra delle
         // applicazioni e Alt+Tab; trasparente intorno al cerchio.
-        m_hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST, kWindowClass, L"Torna su", WS_POPUP, 0, 0, 1,
+        m_hwnd = CreateWindowExW(WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST, kWindowClass, Tr(L"Back to top", L"Torna su"), WS_POPUP, 0, 0, 1,
                                  1, nullptr, nullptr, instance, nullptr);
 
         INITCOMMONCONTROLSEX controls{ sizeof(controls), ICC_WIN95_CLASSES };
@@ -181,7 +182,7 @@ namespace xpx
             tool.uFlags = TTF_SUBCLASS | TTF_IDISHWND;
             tool.hwnd = m_hwnd;
             tool.uId = reinterpret_cast<UINT_PTR>(m_hwnd);
-            tool.lpszText = const_cast<LPWSTR>(L"Torna su");
+            tool.lpszText = const_cast<LPWSTR>(Tr(L"Back to top", L"Torna su"));
             SendMessageW(m_tooltip, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&tool));
             if (!IsLightTheme())
             {

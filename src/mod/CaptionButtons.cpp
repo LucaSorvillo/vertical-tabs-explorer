@@ -2,6 +2,7 @@
 #include "CaptionButtons.h"
 
 #include "ModLog.h"
+#include "../ModShared.h"
 
 #include <dwmapi.h>
 #include <uxtheme.h>
@@ -394,7 +395,9 @@ namespace xpx::mod
                 return result;
             }
         }
-        return button == 0 ? L"Riduci a icona" : button == 1 ? (zoomed ? L"Ripristina" : L"Ingrandisci") : L"Chiudi";
+        return button == 0 ? Tr(L"Minimize", L"Riduci a icona")
+               : button == 1 ? (zoomed ? Tr(L"Restore", L"Ripristina") : Tr(L"Maximize", L"Ingrandisci"))
+                             : Tr(L"Close", L"Chiudi");
     }
 
     void CaptionButtons::ShowTip()

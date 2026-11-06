@@ -130,7 +130,8 @@ namespace
         data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP;
         data.uCallbackMessage = WM_TRAY;
         data.hIcon = icon;
-        wcscpy_s(data.szTip, IsDevModeActive() ? L"VTabsExplorer - modalità prova attiva" : L"VTabsExplorer - ricorda le cartelle di Esplora file");
+        wcscpy_s(data.szTip, IsDevModeActive() ? xpx::Tr(L"VTabsExplorer - test mode on", L"VTabsExplorer - modalità prova attiva")
+                                           : xpx::Tr(L"VTabsExplorer - remembers your File Explorer folders", L"VTabsExplorer - ricorda le cartelle di Esplora file"));
         Shell_NotifyIconW(message, &data);
         if (message == NIM_ADD)
         {
@@ -167,6 +168,10 @@ namespace
 
     std::wstring Count(size_t windows, size_t tabs)
     {
+        if (!xpx::UiItalian())
+        {
+            return std::to_wstring(windows) + (windows == 1 ? L" window, " : L" windows, ") + std::to_wstring(tabs) + (tabs == 1 ? L" tab" : L" tabs");
+        }
         return std::to_wstring(windows) + (windows == 1 ? L" finestra, " : L" finestre, ") + std::to_wstring(tabs) + (tabs == 1 ? L" scheda" : L" schede");
     }
 
@@ -176,36 +181,38 @@ namespace
         const auto status = g_worker.GetStatus();
 
         HMENU menu = CreatePopupMenu();
-        const std::wstring saved = status.savedWindows ? (status.liveWindows ? L"Sessione attuale: " : L"Ultima sessione: ") +
+        const std::wstring saved = status.savedWindows ? (status.liveWindows ? xpx::Tr(L"Current session: ", L"Sessione attuale: ")
+                                                                             : xpx::Tr(L"Last session: ", L"Ultima sessione: ")) +
                                                              Count(status.savedWindows, status.savedTabs)
-                                                       : std::wstring(L"Nessuna sessione salvata");
+                                                       : std::wstring(xpx::Tr(L"No saved session", L"Nessuna sessione salvata"));
         AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, saved.c_str());
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(menu, MF_STRING | (settings.restoreOnOpen ? MF_CHECKED : 0), IdRestoreOnOpen, L"Riapri le cartelle all'apertura di Esplora file");
+        AppendMenuW(menu, MF_STRING | (settings.restoreOnOpen ? MF_CHECKED : 0), IdRestoreOnOpen,
+                    xpx::Tr(L"Reopen your folders when File Explorer opens", L"Riapri le cartelle all'apertura di Esplora file"));
         AppendMenuW(menu, MF_STRING | (status.liveWindows == 0 && status.savedWindows > 0 ? 0 : MF_GRAYED), IdRestoreNow,
-                    L"Riapri ora l'ultima sessione");
+                    xpx::Tr(L"Reopen the last session now", L"Riapri ora l'ultima sessione"));
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(menu, MF_STRING | (settings.backToTop ? MF_CHECKED : 0), IdBackToTop, L"Pulsante «Torna su» nella vista dei file");
-        AppendMenuW(menu, MF_STRING | (settings.reopenTab ? MF_CHECKED : 0), IdReopenTab, L"Riapri la scheda chiusa con Ctrl+Maiusc+T");
+        AppendMenuW(menu, MF_STRING | (settings.backToTop ? MF_CHECKED : 0), IdBackToTop, xpx::Tr(L"Back-to-top button in the file view", L"Pulsante «Torna su» nella vista dei file"));
+        AppendMenuW(menu, MF_STRING | (settings.reopenTab ? MF_CHECKED : 0), IdReopenTab, xpx::Tr(L"Reopen closed tabs with Ctrl+Shift+T", L"Riapri la scheda chiusa con Ctrl+Maiusc+T"));
         AppendMenuW(menu, MF_STRING | (settings.openInTabs ? MF_CHECKED : 0), IdOpenInTabs,
-                    L"Cartelle aperte da altri programmi in una scheda (come Chrome)");
+                    xpx::Tr(L"Folders opened by other apps go into a tab (like Chrome)", L"Cartelle aperte da altri programmi in una scheda (come Chrome)"));
         AppendMenuW(menu, MF_STRING | (settings.verticalTabs && !settings.verticalTabsSuspended ? MF_CHECKED : 0), IdVerticalTabs,
-                    L"Schede verticali (colonna a sinistra)");
+                    xpx::Tr(L"Vertical tabs (column on the left)", L"Schede verticali (colonna a sinistra)"));
         if (settings.verticalTabsSuspended)
         {
-            AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, L"      sospese: Esplora file si è chiuso in modo anomalo");
+            AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, xpx::Tr(L"      suspended: File Explorer closed unexpectedly", L"      sospese: Esplora file si è chiuso in modo anomalo"));
         }
         AppendMenuW(menu, MF_STRING | (settings.navBar && !settings.verticalTabsSuspended ? MF_CHECKED : 0), IdNavBar,
-                    L"Riquadro di spostamento in alto (barra delle cartelle)");
+                    xpx::Tr(L"Navigation pane at the top (folders bar)", L"Riquadro di spostamento in alto (barra delle cartelle)"));
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(menu, MF_STRING | (IsAutostartEnabled() ? MF_CHECKED : 0), IdAutostart, L"Avvia con Windows");
-        AppendMenuW(menu, MF_STRING, IdOpenData, L"Apri cartella impostazioni e log");
+        AppendMenuW(menu, MF_STRING | (IsAutostartEnabled() ? MF_CHECKED : 0), IdAutostart, xpx::Tr(L"Start with Windows", L"Avvia con Windows"));
+        AppendMenuW(menu, MF_STRING, IdOpenData, xpx::Tr(L"Open settings and log folder", L"Apri cartella impostazioni e log"));
         if (IsDevModeActive())
         {
-            AppendMenuW(menu, MF_STRING, IdLeaveDevMode, L"Esci dalla modalità prova (solo finestre di prova)");
+            AppendMenuW(menu, MF_STRING, IdLeaveDevMode, xpx::Tr(L"Leave test mode (test windows only)", L"Esci dalla modalità prova (solo finestre di prova)"));
         }
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(menu, MF_STRING, IdExit, L"Esci");
+        AppendMenuW(menu, MF_STRING, IdExit, xpx::Tr(L"Exit", L"Esci"));
 
         // Necessario perché il menu si chiuda cliccando altrove.
         SetForegroundWindow(hwnd);

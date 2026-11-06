@@ -1460,4 +1460,14 @@ in Esplora file, inattiva, fino al suo riavvio). Per rimuovere tutto: spegnere l
 chiudere la tray, riavviare Esplora file, togliere "Avvia con Windows", cancellare
 `%LOCALAPPDATA%\VTabsExplorer` e la cartella del progetto. Su disco Esplora file non viene mai modificato.
 
-Software personale, non affiliato a Microsoft.
+## Lingua dei testi (dalla 1.1.0)
+
+I testi per l'utente (menu e avvisi della tray, menu "Colore scheda" e nomi dei colori, menu dei gruppi, riquadro
+del nome, suggerimenti, nomi per l'accessibilità) esistono in italiano e in inglese. `UiItalian()` in `ModShared.h`
+legge `GetUserDefaultUILanguage()` una volta per processo, nella tray e nella mod: italiano se la lingua di
+visualizzazione di Windows è l'italiano, altrimenti inglese (cambiarla richiede di disconnettersi).
+`Tr(inglese, italiano)` sceglie il testo. Il markup XAML resta scritto in italiano: in inglese i valori degli
+attributi per l'utente si sostituiscono prima di `XamlReader::Load`. I log restano in italiano. L'installazione
+sceglie la lingua allo stesso modo (Inno Setup, `ShowLanguageDialog=no`).
+
+Non affiliato a Microsoft.

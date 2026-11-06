@@ -111,7 +111,7 @@ namespace xpx::mod
                 group.name = Trimmed(group.name);
                 if (group.name.empty())
                 {
-                    group.name = L"Gruppo";
+                    group.name = Tr(L"Group", L"Gruppo");
                 }
                 groups.push_back(std::move(group));
             }
@@ -625,7 +625,7 @@ namespace xpx::mod
             group.name = Trimmed(name);
             if (group.name.empty())
             {
-                group.name = L"Nuovo gruppo";
+                group.name = Tr(L"New group", L"Nuovo gruppo");
             }
             auto top = TopLevel(state, pinned);
             if (!first.empty())

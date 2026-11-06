@@ -21,7 +21,8 @@ Esplora file trasforma la barra delle schede in una colonna e il riquadro di spo
 restano le schede, i menu e i comandi di Esplora file.
 
 > [!NOTE]
-> I testi dell'app (menu della tray, menu "Colore scheda", menu dei gruppi) per ora sono in italiano.
+> L'app parla la lingua di Windows: italiano se la lingua di visualizzazione di Windows è l'italiano,
+> altrimenti inglese. Lo stesso vale per l'installazione. Gli screenshot mostrano Windows in inglese.
 
 ## Funzioni
 
@@ -142,7 +143,7 @@ Un clic riporta all'inizio senza togliere il fuoco a Esplora file.
 
 1. Scarica `VTabsExplorer-<versione>-setup.exe` dall'[ultima release](https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest).
 2. Avvialo. Non servono diritti di amministratore: si installa in `%LOCALAPPDATA%\Programs\VTabsExplorer`.
-   L'installazione è in italiano o in inglese, e propone di:
+   Come l'app, l'installazione segue la lingua di Windows (italiano o inglese), e propone di:
    - avviare l'app con Windows (serve a riaprire le cartelle dopo un riavvio);
    - attivare le schede verticali;
    - attivare la barra delle cartelle.
@@ -173,6 +174,8 @@ Tutto è nel menu della tray (clic destro sull'icona):
 | Avvia con Windows | scelta nell'installazione |
 | Apri cartella impostazioni e log | |
 | Esci | |
+
+Con Windows in un'altra lingua le voci sono in inglese, come nell'immagine.
 
 Spegnendo le schede verticali o la barra delle cartelle tornano subito la normale barra delle schede e il
 riquadro di spostamento di Esplora file.
@@ -267,7 +270,6 @@ già aperte tengono le schede verticali finché Esplora file non si riavvia (o f
   [apri una segnalazione](https://github.com/LucaSorvillo/vertical-tabs-explorer/issues) indicando la versione
   di Windows (<kbd>Win</kbd>+<kbd>R</kbd> › `winver`).
 - Una scheda riaperta torna in fondo all'elenco delle schede, non al posto che aveva.
-- I testi dell'app sono in italiano.
 - Solo x64.
 
 ## Vedi anche

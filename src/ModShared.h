@@ -14,6 +14,20 @@ namespace xpx
 {
     inline constexpr wchar_t kModDllName[] = L"VTabsExplorerMod.dll";
 
+    // Lingua dei testi dell'app (menu e avvisi della tray, menu e suggerimenti della mod): l'italiano se la lingua
+    // di visualizzazione di Windows dell'utente è l'italiano, altrimenti l'inglese. Si legge una volta per
+    // processo: cambiare la lingua di Windows richiede di disconnettersi.
+    inline bool UiItalian()
+    {
+        static const bool italian = PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_ITALIAN;
+        return italian;
+    }
+    // Il testo nella lingua dell'app.
+    inline const wchar_t* Tr(const wchar_t* english, const wchar_t* italian)
+    {
+        return UiItalian() ? italian : english;
+    }
+
 
     // Processo della barra delle applicazioni: è l'explorer.exe che possiede Shell_TrayWnd (con
     // l'impostazione predefinita di Windows è anche quello di tutte le finestre di Esplora file).

@@ -101,6 +101,16 @@ replaces two slots in vtables shared by all instances of a class (public WinRT i
 - Test mode (`dev-filter.txt`, `dev-windows.txt` in the data folder) restricts the tray app and the module to
   the windows opened by the tests. `mod-command.txt` accepts test commands addressed to one window.
 
+## Languages
+
+The texts the user sees (tray menu and notifications, the "Tab color" menu and the color names, the group menus,
+the rename box, tooltips, accessibility names) exist in English and Italian. `UiItalian()` in `ModShared.h` reads
+`GetUserDefaultUILanguage()` once per process, in the tray app and in the module: Italian if the Windows display
+language is Italian, English otherwise (changing it requires signing out). `Tr(english, italian)` picks the text.
+The XAML markup is written in Italian; in English, the user-facing attribute values are replaced before
+`XamlReader::Load`. Logs stay in Italian. The installer chooses its language the same way (Inno Setup detects the
+UI language; `ShowLanguageDialog=no`, English first).
+
 ## Data files
 
 All in `%LOCALAPPDATA%\VTabsExplorer`: `settings.ini`, `session.txt`, `closed.txt`, `navbar-groups.json`,

@@ -1,6 +1,7 @@
 #include "Worker.h"
 
 #include "Common.h"
+#include "ModShared.h"
 #include "TabColorFiles.h"
 
 #include <algorithm>
@@ -1086,13 +1087,24 @@ namespace xpx
             count == 1 ? L"scheda non riaperta" : L"schede non riaperte");
         if (m_notify && m_root.empty()) // in modalità prova niente fumetti
         {
-            std::wstring text = count == 1 ? std::wstring(L"Una scheda non si è riaperta")
-                                           : std::to_wstring(count) + L" schede non si sono riaperte";
-            text += L": Esplora file era ancora occupato. ";
-            text += Settings::Load().reopenTab
-                        ? (count == 1 ? L"Premi Ctrl+Maiusc+T in Esplora file per riaprirla."
-                                      : L"Premi Ctrl+Maiusc+T in Esplora file per riaprirle.")
-                        : L"Attiva «Riapri la scheda chiusa con Ctrl+Maiusc+T» nel menu di VTabsExplorer e premilo in Esplora file.";
+            std::wstring text;
+            if (!UiItalian())
+            {
+                text = count == 1 ? std::wstring(L"A tab didn't reopen") : std::to_wstring(count) + L" tabs didn't reopen";
+                text += L": File Explorer was still busy. ";
+                text += Settings::Load().reopenTab ? (count == 1 ? L"Press Ctrl+Shift+T in File Explorer to reopen it."
+                                                                 : L"Press Ctrl+Shift+T in File Explorer to reopen them.")
+                                                   : L"Turn on \"Reopen closed tabs with Ctrl+Shift+T\" in the VTabsExplorer menu and press it in File Explorer.";
+            }
+            else
+            {
+                text = count == 1 ? std::wstring(L"Una scheda non si è riaperta") : std::to_wstring(count) + L" schede non si sono riaperte";
+                text += L": Esplora file era ancora occupato. ";
+                text += Settings::Load().reopenTab
+                            ? (count == 1 ? L"Premi Ctrl+Maiusc+T in Esplora file per riaprirla."
+                                          : L"Premi Ctrl+Maiusc+T in Esplora file per riaprirle.")
+                            : L"Attiva «Riapri la scheda chiusa con Ctrl+Maiusc+T» nel menu di VTabsExplorer e premilo in Esplora file.";
+            }
             m_notify(text);
         }
     }

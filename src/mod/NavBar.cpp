@@ -448,7 +448,7 @@ namespace xpx::mod
             m_items.Spacing(kItemSpacing);
             m_items.VerticalAlignment(mux::VerticalAlignment::Center);
             m_items.Margin(mux::Thickness{ kSideMargin, 0, 0, 0 });
-            mux::Automation::AutomationProperties::SetName(m_items, L"Barra delle cartelle");
+            mux::Automation::AutomationProperties::SetName(m_items, Tr(L"Folders bar", L"Barra delle cartelle"));
             m_root.Children().Append(m_items);
 
             // "»": le voci che non ci stanno (come la barra dei segnalibri di Chrome).
@@ -466,8 +466,8 @@ namespace xpx::mod
             more.FontSize(16);
             more.Margin(mux::Thickness{ 0, -3, 0, 0 });
             m_overflow.Content(more);
-            mux::Automation::AutomationProperties::SetName(m_overflow, L"Altre cartelle");
-            muxc::ToolTipService::SetToolTip(m_overflow, winrt::box_value(L"Altre cartelle"));
+            mux::Automation::AutomationProperties::SetName(m_overflow, Tr(L"More folders", L"Altre cartelle"));
+            muxc::ToolTipService::SetToolTip(m_overflow, winrt::box_value(Tr(L"More folders", L"Altre cartelle")));
             m_overflow.Visibility(mux::Visibility::Collapsed);
             muxc::Grid::SetColumn(m_overflow, 1);
             m_root.Children().Append(m_overflow);
@@ -854,15 +854,15 @@ namespace xpx::mod
         std::wstring text = NameOf(key) + L"\n";
         if (folders == 0 && groups == 0)
         {
-            return text + L"Gruppo vuoto";
+            return text + Tr(L"Empty group", L"Gruppo vuoto");
         }
         if (folders > 0)
         {
-            text += CountText(folders, L"cartella", L"cartelle");
+            text += CountText(folders, Tr(L"folder", L"cartella"), Tr(L"folders", L"cartelle"));
         }
         if (groups > 0)
         {
-            text += (folders > 0 ? L", " : L"") + CountText(groups, L"gruppo", L"gruppi");
+            text += (folders > 0 ? L", " : L"") + CountText(groups, Tr(L"group", L"gruppo"), Tr(L"groups", L"gruppi"));
         }
         return text;
     }
@@ -1504,12 +1504,12 @@ namespace xpx::mod
         if (level->group.empty())
         {
             level->firstEntry = m_visibleCount;
-            mux::Automation::AutomationProperties::SetName(level->list, L"Elenco delle altre cartelle");
+            mux::Automation::AutomationProperties::SetName(level->list, Tr(L"List of more folders", L"Elenco delle altre cartelle"));
         }
         else
         {
             const NavGroup* group = m_groups->Find(level->group);
-            mux::Automation::AutomationProperties::SetName(level->list, L"Gruppo " + (group ? group->name : std::wstring{}));
+            mux::Automation::AutomationProperties::SetName(level->list, Tr(L"Group ", L"Gruppo ") + (group ? group->name : std::wstring{}));
         }
         const auto content = LevelContent(*level);
         for (size_t r = 0; r < content.size(); ++r)
@@ -1530,11 +1530,11 @@ namespace xpx::mod
         {
             // Come Chrome: "(vuoto)".
             muxc::TextBlock empty;
-            empty.Text(L"(vuoto)");
+            empty.Text(Tr(L"(empty)", L"(vuoto)"));
             empty.FontSize(kTextSize);
             empty.Opacity(0.6);
             empty.Margin(mux::Thickness{ 16, 6, 16, 6 });
-            mux::Automation::AutomationProperties::SetName(empty, L"Gruppo vuoto");
+            mux::Automation::AutomationProperties::SetName(empty, Tr(L"Empty group", L"Gruppo vuoto"));
             level->list.Children().Append(empty);
         }
     }
@@ -1963,8 +1963,9 @@ namespace xpx::mod
         }
         if (keys.size() > kOpenAllConfirm)
         {
-            const std::wstring question = L"Aprire " + std::to_wstring(keys.size()) + L" cartelle in schede nuove?";
-            if (MessageBoxW(m_main, question.c_str(), L"Esplora file", MB_OKCANCEL | MB_ICONQUESTION) != IDOK)
+            const std::wstring question = UiItalian() ? L"Aprire " + std::to_wstring(keys.size()) + L" cartelle in schede nuove?"
+                                                      : L"Open " + std::to_wstring(keys.size()) + L" folders in new tabs?";
+            if (MessageBoxW(m_main, question.c_str(), Tr(L"File Explorer", L"Esplora file"), MB_OKCANCEL | MB_ICONQUESTION) != IDOK)
             {
                 return;
             }
@@ -2391,21 +2392,21 @@ namespace xpx::mod
         {
             AppendMenuW(groups, MF_SEPARATOR, 0, nullptr);
         }
-        AppendMenuW(groups, MF_STRING, firstId + 1, L"Nuovo gruppo…");
+        AppendMenuW(groups, MF_STRING, firstId + 1, Tr(L"New group…", L"Nuovo gruppo…"));
         MENUITEMINFOW info{ sizeof(info) };
         info.fMask = MIIM_SUBMENU | MIIM_STRING | MIIM_ID;
         info.wID = lastId;
         info.hSubMenu = groups;
-        wchar_t moveText[] = L"Sposta nel gruppo";
-        info.dwTypeData = moveText;
+        std::wstring moveText{ Tr(L"Move to group", L"Sposta nel gruppo") };
+        info.dwTypeData = moveText.data();
         InsertMenuItemW(menu, static_cast<UINT>(position), TRUE, &info);
         if (!parent.empty())
         {
             MENUITEMINFOW out{ sizeof(out) };
             out.fMask = MIIM_STRING | MIIM_ID;
             out.wID = firstId;
-            wchar_t outText[] = L"Togli dal gruppo";
-            out.dwTypeData = outText;
+            std::wstring outText{ Tr(L"Remove from group", L"Togli dal gruppo") };
+            out.dwTypeData = outText.data();
             InsertMenuItemW(menu, static_cast<UINT>(position + 1), TRUE, &out);
         }
     }
@@ -2491,15 +2492,16 @@ namespace xpx::mod
             menu.Items().Append(item);
             return item;
         };
-        add(L"Apri tutte (" + std::to_wstring(folders) + L")", L"", [id](NavBar& self) {
+        add(Tr(L"Open all (", L"Apri tutte (") + std::to_wstring(folders) + L")", L"", [id](NavBar& self) {
             self.CloseLevels(0);
             self.OpenAll(id);
         }, folders > 0);
         menu.Items().Append(muxc::MenuFlyoutSeparator());
-        add(L"Nuovo gruppo…", L"", [id](NavBar& self) { self.NewGroup(id, L"", L"", true); }, true);
-        add(L"Rinomina…", L"", [id](NavBar& self) { self.EditGroupName(id, false); }, true);
-        const auto remove = add(L"Elimina gruppo", L"", [id](NavBar& self) { self.DeleteGroup(id); }, true);
-        muxc::ToolTipService::SetToolTip(remove, winrt::box_value(L"Il contenuto passa al livello di sopra; le cartelle restano in Accesso rapido."));
+        add(Tr(L"New group…", L"Nuovo gruppo…"), L"", [id](NavBar& self) { self.NewGroup(id, L"", L"", true); }, true);
+        add(Tr(L"Rename…", L"Rinomina…"), L"", [id](NavBar& self) { self.EditGroupName(id, false); }, true);
+        const auto remove = add(Tr(L"Delete group", L"Elimina gruppo"), L"", [id](NavBar& self) { self.DeleteGroup(id); }, true);
+        muxc::ToolTipService::SetToolTip(remove, winrt::box_value(Tr(L"The contents move up one level; the folders stay in Quick Access.",
+                                                                     L"Il contenuto passa al livello di sopra; le cartelle restano in Accesso rapido.")));
         muxcp::FlyoutShowOptions options;
         if (position)
         {
@@ -2518,7 +2520,7 @@ namespace xpx::mod
             menu.MenuFlyoutPresenterStyle(style);
         }
         muxc::MenuFlyoutItem item;
-        item.Text(L"Nuovo gruppo…");
+        item.Text(Tr(L"New group…", L"Nuovo gruppo…"));
         muxc::FontIcon icon;
         icon.Glyph(L"");
         item.Icon(icon);
@@ -2559,7 +2561,7 @@ namespace xpx::mod
     void NavBar::NewGroup(std::wstring const& container, std::wstring const& before, std::wstring const& first, bool edit)
     {
         std::wstring id;
-        const auto state = NavGroups::Instance().Create(L"Nuovo gruppo", container, before, first, PinnedKeys(), &id);
+        const auto state = NavGroups::Instance().Create(Tr(L"New group", L"Nuovo gruppo"), container, before, first, PinnedKeys(), &id);
         if (!state)
         {
             XPX_MLOG(L"NavBar: gruppo non creato.");
@@ -2613,21 +2615,21 @@ namespace xpx::mod
         panel.Width(300);
         panel.RequestedTheme(m_theme);
         muxc::TextBlock title;
-        title.Text(created ? L"Nuovo gruppo" : L"Rinomina gruppo");
+        title.Text(created ? Tr(L"New group", L"Nuovo gruppo") : Tr(L"Rename group", L"Rinomina gruppo"));
         title.FontSize(14);
         title.FontWeight(winrt::Windows::UI::Text::FontWeight{ 600 });
         muxc::TextBox box;
         box.Text(group->name);
         box.MaxLength(100);
-        mux::Automation::AutomationProperties::SetName(box, L"Nome del gruppo");
+        mux::Automation::AutomationProperties::SetName(box, Tr(L"Group name", L"Nome del gruppo"));
         muxc::StackPanel buttons;
         buttons.Orientation(muxc::Orientation::Horizontal);
         buttons.Spacing(8);
         buttons.HorizontalAlignment(mux::HorizontalAlignment::Right);
-        auto save = AccentButton(L"Salva");
+        auto save = AccentButton(Tr(L"Save", L"Salva"));
         save.MinWidth(80);
         muxc::Button cancel;
-        cancel.Content(winrt::box_value(L"Annulla"));
+        cancel.Content(winrt::box_value(Tr(L"Cancel", L"Annulla")));
         cancel.MinWidth(80);
         buttons.Children().Append(save);
         buttons.Children().Append(cancel);

@@ -12,15 +12,15 @@ namespace xpx::mod::tabcolors
 
         // Stessi indici di kTabColorKeys (ModShared.h): grey, blue, red, yellow, green, pink, purple, cyan, orange.
         constexpr Swatch kPalette[] = {
-            { 1, L"Grigio", Rgb(0x5F6368), Rgb(0xBDC1C6) },
-            { 2, L"Blu", Rgb(0x1A73E8), Rgb(0x8AB4F8) },
-            { 3, L"Rosso", Rgb(0xD93025), Rgb(0xF28B82) },
-            { 4, L"Giallo", Rgb(0xF9AB00), Rgb(0xFDD663) },
-            { 5, L"Verde", Rgb(0x188038), Rgb(0x81C995) },
-            { 6, L"Rosa", Rgb(0xD01884), Rgb(0xFF8BCB) },
-            { 7, L"Viola", Rgb(0x9334E6), Rgb(0xC58AF9) },
-            { 8, L"Azzurro", Rgb(0x007B83), Rgb(0x78D9EC) },
-            { 9, L"Arancione", Rgb(0xFA903E), Rgb(0xFCAD70) },
+            { 1, L"Grey", L"Grigio", Rgb(0x5F6368), Rgb(0xBDC1C6) },
+            { 2, L"Blue", L"Blu", Rgb(0x1A73E8), Rgb(0x8AB4F8) },
+            { 3, L"Red", L"Rosso", Rgb(0xD93025), Rgb(0xF28B82) },
+            { 4, L"Yellow", L"Giallo", Rgb(0xF9AB00), Rgb(0xFDD663) },
+            { 5, L"Green", L"Verde", Rgb(0x188038), Rgb(0x81C995) },
+            { 6, L"Pink", L"Rosa", Rgb(0xD01884), Rgb(0xFF8BCB) },
+            { 7, L"Purple", L"Viola", Rgb(0x9334E6), Rgb(0xC58AF9) },
+            { 8, L"Cyan", L"Azzurro", Rgb(0x007B83), Rgb(0x78D9EC) },
+            { 9, L"Orange", L"Arancione", Rgb(0xFA903E), Rgb(0xFCAD70) },
         };
     }
 
