@@ -130,8 +130,7 @@ namespace
         data.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP;
         data.uCallbackMessage = WM_TRAY;
         data.hIcon = icon;
-        wcscpy_s(data.szTip, IsDevModeActive() ? xpx::Tr(L"VTabsExplorer - test mode on", L"VTabsExplorer - modalità prova attiva")
-                                           : xpx::Tr(L"VTabsExplorer - remembers your File Explorer folders", L"VTabsExplorer - ricorda le cartelle di Esplora file"));
+        wcscpy_s(data.szTip, xpx::kAppName); // solo il nome dell'app
         Shell_NotifyIconW(message, &data);
         if (message == NIM_ADD)
         {

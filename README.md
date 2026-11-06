@@ -1,4 +1,4 @@
-# Vertical Tabs for File Explorer
+# <img src="docs/assets/icon-128.png" alt="" width="40" height="40"> Vertical Tabs for File Explorer
 
 **Chrome-style vertical tabs for Windows 11 File Explorer**, plus a folders bar like Chrome's bookmarks bar
 (with groups), session restore, tab colors and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>.
@@ -107,8 +107,8 @@ now** in the tray menu brings everything back on request.
 
 ![Closing a tab and reopening it](docs/assets/explorer-reopen.gif)
 
-Like in a browser: the closed tab comes back as the active tab, at the end of the tab list. If you closed a
-whole window, the whole window comes back, with all its tabs. Press again to go further back, up to 25
+Like in a browser: the closed tab comes back **in its place**, with its color, and becomes the active tab
+(with the vertical tabs on; otherwise it comes back at the end of the tab list). If you closed a whole window, the whole window comes back, with all its tabs. Press again to go further back, up to 25
 entries. The history survives restarting File Explorer, the app or the PC.
 
 The shortcut is taken only while a File Explorer window is active, so other apps (your browser, for example)
@@ -265,7 +265,6 @@ open keep the vertical tabs until File Explorer restarts (or until you sign out)
   can change. If something looks wrong, turn the feature off from the tray menu, and please
   [open an issue](https://github.com/LucaSorvillo/vertical-tabs-explorer/issues) with your Windows version
   (<kbd>Win</kbd>+<kbd>R</kbd> › `winver`).
-- A reopened tab comes back at the end of the tab list, not in its old place.
 - x64 only.
 
 ## Related

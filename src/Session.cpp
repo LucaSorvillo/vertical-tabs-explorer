@@ -286,7 +286,13 @@ namespace xpx
         out << kClosedHeader << "\n";
         for (auto const& entry : entries)
         {
-            out << "window " << (entry.wholeWindow ? "whole" : "tabs") << "\n";
+            // "window tabs at 3": il posto della scheda nella sua finestra (i file senza "at" restano validi)
+            out << "window " << (entry.wholeWindow ? "whole" : "tabs");
+            if (!entry.wholeWindow && entry.index >= 0)
+            {
+                out << " at " << entry.index;
+            }
+            out << "\n";
             WriteWindow(out, entry.window);
         }
         return WriteAtomically(file, out.str());
@@ -304,7 +310,9 @@ namespace xpx
         }
         for (size_t i = 0; i < windows.size(); ++i)
         {
-            entries.push_back(ClosedEntry{ i < kinds.size() && kinds[i] == "whole", std::move(windows[i]) });
+            const std::string kind = i < kinds.size() ? kinds[i] : std::string{};
+            const size_t at = kind.find(" at ");
+            entries.push_back(ClosedEntry{ kind == "whole", std::move(windows[i]), at == std::string::npos ? -1 : std::atoi(kind.c_str() + at + 4) });
         }
         return entries;
     }

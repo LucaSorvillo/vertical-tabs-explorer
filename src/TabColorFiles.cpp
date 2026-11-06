@@ -98,7 +98,7 @@ namespace xpx
 
     void WritePendingColors(HWND window, TabColorList const& list)
     {
-        if (!window || list.colored.empty())
+        if (!window || (list.colored.empty() && list.moveFrom < 0))
         {
             return;
         }

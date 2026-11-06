@@ -51,7 +51,9 @@ più avanti.
   la scheda attiva e la cartella mostrata.
 
 - **Riapri la scheda chiusa con Ctrl+Maiusc+T**, come nel browser: la scheda chiusa per sbaglio torna
-  (in fondo alla barra, attiva: Esplora file non sa inserirla in mezzo) e premendo di nuovo si va a
+  al suo posto, attiva e con il suo colore (dalla 1.2.0: Esplora file sa solo aggiungerla in fondo, la tray scrive
+  nel file dei colori `move=da,a` e la mod la riporta dov'era con lo stesso spostamento del riordino; senza le
+  schede verticali resta in fondo) e premendo di nuovo si va a
   ritroso, fino a 25 schede. Se è stata chiusa un'intera finestra torna la finestra, con tutte le sue
   schede, la scheda attiva e la sua posizione (velata mentre si costruisce: compare già completa). Una
   scheda la cui finestra non c'è più si riapre in quella in uso. Come in Chrome **la pila resta**: si chiude

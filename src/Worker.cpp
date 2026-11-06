@@ -104,10 +104,17 @@ namespace xpx
         // Colori da rimettere nelle schede appena create in una finestra (dopo BuildTabs): tabs nell'ordine in
         // cui sono nella barra a partire dalla posizione first, tranne gli indici in missing (schede non
         // riaperte). La mod li applica quando la finestra ha le schede che ha adesso.
-        void QueueTabColors(HWND window, std::vector<Tab> const& tabs, size_t first, std::vector<size_t> const& missing = {})
+        // moveTo >= 0: la scheda appena aggiunta in posizione first va spostata lì (Ctrl+Maiusc+T: torna al suo posto). Lo fa
+        // la mod insieme ai colori (schede verticali); senza la mod la scheda resta in fondo.
+        void QueueTabColors(HWND window, std::vector<Tab> const& tabs, size_t first, std::vector<size_t> const& missing = {}, int moveTo = -1)
         {
             TabColorList list;
             list.count = static_cast<size_t>(TabCount(window));
+            if (moveTo >= 0 && static_cast<size_t>(moveTo) != first)
+            {
+                list.moveFrom = static_cast<int>(first);
+                list.moveTo = moveTo;
+            }
             for (size_t i = 0; i < tabs.size(); ++i)
             {
                 if (tabs[i].color > 0 && std::find(missing.begin(), missing.end(), i) == missing.end())
@@ -727,7 +734,7 @@ namespace xpx
         m_reopenStack.clear();
         for (auto& entry : LoadClosedStack(ClosedStackPath(!root.empty())))
         {
-            m_reopenStack.push_back(ClosedItem{ entry.wholeWindow, nullptr, std::move(entry.window) });
+            m_reopenStack.push_back(ClosedItem{ entry.wholeWindow, nullptr, std::move(entry.window), entry.index });
         }
         if (m_reopenStack.size() > kMaxReopen)
         {
@@ -934,6 +941,7 @@ namespace xpx
             HWND window;
             Tab tab;
             ULONGLONG closed; // dal gancio sulle distruzioni (0 se non si sa)
+            int index;        // posto che aveva nella finestra (per riaprirla lì)
         };
         std::vector<ClosedTab> closedTabs;
         for (auto const& window : m_live)
@@ -942,15 +950,16 @@ namespace xpx
             {
                 continue;
             }
-            for (auto const& tab : window.tabs)
+            for (size_t t = 0; t < window.tabs.size(); ++t)
             {
+                Tab const& tab = window.tabs[t];
                 if (!tab.tabWindow || IsWindow(tab.tabWindow) ||
                     std::find(closedWithWindow.begin(), closedWithWindow.end(), tab.tabWindow) != closedWithWindow.end() ||
                     std::find(m_recordedTabs.begin(), m_recordedTabs.end(), tab.tabWindow) != m_recordedTabs.end())
                 {
                     continue;
                 }
-                closedTabs.push_back(ClosedTab{ window.hwnd, tab, m_veil.DestroyedAt(tab.tabWindow) });
+                closedTabs.push_back(ClosedTab{ window.hwnd, tab, m_veil.DestroyedAt(tab.tabWindow), static_cast<int>(t) });
                 m_recordedTabs.push_back(tab.tabWindow);
             }
         }
@@ -961,7 +970,7 @@ namespace xpx
         {
             Window one;
             one.tabs.push_back(std::move(entry.tab));
-            PushClosed(ClosedItem{ false, entry.window, std::move(one) });
+            PushClosed(ClosedItem{ false, entry.window, std::move(one), entry.index });
         }
 
         // Stato attuale, nell'ordine Z: le finestre note si aggiornano (se non se ne leggono le schede
@@ -1142,7 +1151,7 @@ namespace xpx
         entries.reserve(m_reopenStack.size());
         for (auto const& item : m_reopenStack)
         {
-            entries.push_back(ClosedEntry{ item.wholeWindow, item.window });
+            entries.push_back(ClosedEntry{ item.wholeWindow, item.window, item.index });
         }
         if (SaveClosedStack(ClosedStackPath(!m_root.empty()), entries))
         {
@@ -1237,8 +1246,12 @@ namespace xpx
             const size_t position = static_cast<size_t>(TabCount(target));
             std::vector<size_t> missing;
             m_explorer->BuildTabs(target, item.window.tabs, false, static_cast<int>(position), &missing);
-            // Torna con il suo colore (schede verticali).
-            QueueTabColors(target, item.window.tabs, position, missing);
+            // Torna con il suo colore e, nella sua finestra, al posto che aveva, come nel browser e in VTabsNotepad: lo
+            // spostamento lo fa la mod insieme ai colori (schede verticali); senza la mod la scheda resta in fondo.
+            const int place = target == item.from && item.index >= 0 && item.window.tabs.size() == 1 && missing.empty()
+                                  ? std::min(item.index, static_cast<int>(position))
+                                  : -1;
+            QueueTabColors(target, item.window.tabs, position, missing, place);
             if (!missing.empty())
             {
                 // Quelle che non si sono riaperte restano in pila (come prima nella loro finestra).

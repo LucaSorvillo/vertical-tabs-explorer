@@ -3118,6 +3118,16 @@ namespace xpx::mod
             }
         }
         XPX_MLOG(L"VerticalTabs: colori rimessi a %zu schede su %u%s.", applied, count, count != m_pendingColors->count ? L" (finestra incompleta)" : L"");
+        // Scheda riaperta con Ctrl+Maiusc+T: dal fondo al posto che aveva (i colori, già dati, la seguono). Solo con la finestra
+        // come l'ha lasciata la tray: se intanto le schede sono cambiate, resta dov'è.
+        const int moveFrom = m_pendingColors->moveFrom;
+        const int moveTo = m_pendingColors->moveTo;
+        if (moveFrom >= 0 && moveTo >= 0 && moveFrom != moveTo && count == m_pendingColors->count && moveFrom < static_cast<int>(count) &&
+            moveTo < static_cast<int>(count))
+        {
+            const bool moved = MoveNativeTab(moveFrom, moveTo);
+            XPX_MLOG(L"VerticalTabs: scheda riaperta rimessa al suo posto (%d -> %d): %s.", moveFrom, moveTo, moved ? L"fatto" : L"non riuscito");
+        }
         m_pendingColors.reset();
         DeleteFileW(ColorFilePath(L"pending").c_str());
         UpdateAllRows();

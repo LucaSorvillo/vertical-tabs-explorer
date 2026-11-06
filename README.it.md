@@ -1,4 +1,4 @@
-# Vertical Tabs for File Explorer
+# <img src="docs/assets/icon-128.png" alt="" width="40" height="40"> Vertical Tabs for File Explorer
 
 **Schede verticali come in Chrome per Esplora file di Windows 11**, con una barra delle cartelle come la barra
 dei segnalibri di Chrome (con i gruppi), il ripristino delle finestre, i colori delle schede e
@@ -109,8 +109,8 @@ ora l'ultima sessione** nel menu della tray riporta tutto quando lo si chiede.
 
 ![Una scheda chiusa e riaperta](docs/assets/explorer-reopen.gif)
 
-Come nel browser: la scheda chiusa torna come scheda attiva, in fondo all'elenco delle schede. Se si è chiusa
-un'intera finestra, torna tutta la finestra, con tutte le sue schede. Premendo di nuovo si va a ritroso, fino a
+Come nel browser: la scheda chiusa torna **al suo posto**, con il suo colore, e diventa quella attiva (con le
+schede verticali accese; altrimenti torna in fondo all'elenco delle schede). Se si è chiusa un'intera finestra, torna tutta la finestra, con tutte le sue schede. Premendo di nuovo si va a ritroso, fino a
 25 voci. La cronologia resta anche riavviando Esplora file, l'app o il PC.
 
 La scorciatoia si prende solo mentre è attiva una finestra di Esplora file, quindi resta libera per gli altri
@@ -269,7 +269,6 @@ già aperte tengono le schede verticali finché Esplora file non si riavvia (o f
   aggiornamento di Windows può cambiare. Se qualcosa non va, spegni la funzione dal menu della tray e
   [apri una segnalazione](https://github.com/LucaSorvillo/vertical-tabs-explorer/issues) indicando la versione
   di Windows (<kbd>Win</kbd>+<kbd>R</kbd> › `winver`).
-- Una scheda riaperta torna in fondo all'elenco delle schede, non al posto che aveva.
 - Solo x64.
 
 ## Vedi anche

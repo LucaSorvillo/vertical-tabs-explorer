@@ -118,11 +118,19 @@ namespace xpx
     {
         size_t count = 0;                   // schede della finestra quando è stato scritto
         std::vector<TabColorEntry> colored; // solo le schede colorate
+        // Solo nei file della tray ("move=<da>,<a>"): la scheda appena riaperta con Ctrl+Maiusc+T, in fondo, va rimessa
+        // al suo posto; la mod la sposta dopo aver dato i colori (che seguono la scheda). -1 = nessuno spostamento.
+        int moveFrom = -1;
+        int moveTo = -1;
     };
 
     inline std::string FormatTabColors(TabColorList const& list)
     {
         std::string text = "count=" + std::to_string(list.count) + "\r\n";
+        if (list.moveFrom >= 0 && list.moveTo >= 0)
+        {
+            text += "move=" + std::to_string(list.moveFrom) + "," + std::to_string(list.moveTo) + "\r\n";
+        }
         for (auto const& entry : list.colored)
         {
             if (entry.color > 0 && entry.color < kTabColorCount)
@@ -170,6 +178,16 @@ namespace xpx
             if (name == "count")
             {
                 list.count = static_cast<size_t>(strtoull(value.c_str(), nullptr, 10));
+                continue;
+            }
+            if (name == "move")
+            {
+                const size_t comma = value.find(',');
+                if (comma != std::string::npos)
+                {
+                    list.moveFrom = atoi(value.substr(0, comma).c_str());
+                    list.moveTo = atoi(value.substr(comma + 1).c_str());
+                }
                 continue;
             }
             const size_t bar = value.find('|');

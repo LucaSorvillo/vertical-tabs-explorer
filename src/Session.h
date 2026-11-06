@@ -47,6 +47,7 @@ namespace xpx
     {
         bool wholeWindow = false;
         Window window;
+        int index = -1; // posto che aveva la scheda chiusa nella sua finestra (solo schede singole; -1 = non noto)
     };
     bool SaveClosedStack(std::wstring const& file, std::vector<ClosedEntry> const& entries);
     std::vector<ClosedEntry> LoadClosedStack(std::wstring const& file);

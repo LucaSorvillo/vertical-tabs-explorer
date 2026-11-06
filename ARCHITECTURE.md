@@ -29,12 +29,12 @@ taskbar and the desktop, so the module has extra safety measures.
 | `main.cpp` | Tray icon and menu, settings, "start with Windows", command line (`--restore-now`, `--reopen-tab`, `--exit`, `--inject-pid <pid>`). |
 | `Worker.cpp` | The real work, on its own thread, because calls into File Explorer are cross-process and can be slow. Tracks live windows and saves the session on every change. Restores the session when File Explorer is reopened. Keeps the stack of closed tabs and windows. Moves folders opened by other apps into a tab. |
 | `Explorer.cpp` | Shell COM wrapper: `IShellWindows` / `IWebBrowser2` to read windows and tabs, open a tab (the window's "new tab" command, then `Navigate2`), activate and place windows. |
-| `Session.cpp` | `session.txt` and `closed.txt`: versioned text formats, written atomically. |
+| `Session.cpp` | `session.txt` and `closed.txt`: versioned text formats, written atomically. A closed tab keeps the position it had (`window tabs at N`). |
 | `Veil.cpp` | Makes a window invisible without removing it from the taskbar (`WS_EX_LAYERED`, opacity 0) while it is rebuilt. A WinEvent hook on File Explorer's process catches new windows before they are seen. |
 | `BackToTop.cpp` | The back-to-top button: a small layered window that never takes the focus. It reacts to `EVENT_OBJECT_CONTENTSCROLLED` from the file view and reads the position with the UI Automation `ScrollPattern`. |
 | `Hotkey.cpp` | <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> is registered only while a File Explorer window is in the foreground. |
 | `ModManager.cpp`, `Injector.cpp` | Load the module into the `explorer.exe` processes that have windows, only when the feature is on. Every process with the module is watched: if it ends with an NTSTATUS error code, the feature is suspended (`Enabled=0`, `Suspended=1`) and the user is told. |
-| `TabColorFiles.cpp` | Exchanges tab colors with the module through files in `colors\`: the module publishes the live colors, and the tray app sends the colors to apply to reopened tabs. |
+| `TabColorFiles.cpp` | Exchanges tab colors with the module through files in `colors\`: the module publishes the live colors, and the tray app sends the colors to apply to reopened tabs. For a tab reopened with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> the file also says where to move it (`move=from,to`): File Explorer can only add a tab at the end, so the module moves it back with the same reorder the column uses. |
 | `Common.cpp`, `Settings.cpp`, `ModShared.h` | Paths, test mode, `settings.ini`, constants shared with the module (such as the color keys). |
 
 The module DLL is copied to `%LOCALAPPDATA%\VTabsExplorer\runtime\<stamp>\` before being loaded, so the
@@ -120,6 +120,8 @@ All in `%LOCALAPPDATA%\VTabsExplorer`: `settings.ini`, `session.txt`, `closed.tx
 
 - `build.ps1` loads the Visual Studio x64 environment, generates the projections and builds with CMake + Ninja
   into `build\bin`. It also restarts the tray app if it was running.
+- `tools\Make-Icon.ps1` draws the app icon, the tray icon on a dark tile, into `src\VTabsExplorer.ico` (used by the
+  executable and the setup) and into the PNGs of the website and the README.
 - `tools\Generate-Projections.ps1` runs `cppwinrt.exe` on the Windows SDK and on the Windows App SDK runtime
   that `explorer.exe` loads (`%windir%\SystemApps\Microsoft.WindowsAppRuntime.CBS*`), so the interfaces match
   the ones in the process.

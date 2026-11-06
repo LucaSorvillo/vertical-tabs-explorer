@@ -78,6 +78,7 @@ namespace xpx
             bool wholeWindow = false; // tutta la finestra (chiudendola si riapre lei, non le sue schede)
             HWND from = nullptr;      // finestra da cui veniva la scheda (può essere già chiusa)
             Window window;            // la finestra chiusa, o la sola scheda chiusa in window.tabs[0]
+            int index = -1;           // posto che aveva la scheda nella sua finestra (-1 = non noto: si riapre in fondo)
         };
 
         void Run();

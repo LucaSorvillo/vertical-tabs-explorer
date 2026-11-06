@@ -4,7 +4,7 @@
 
 #define AppName "Vertical Tabs for File Explorer"
 #define AppShortName "VTabsExplorer"
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 #define AppPublisher "LucaSorvillo"
 #define AppRepo "https://github.com/LucaSorvillo/vertical-tabs-explorer"
 #define AppSite "https://lucasorvillo.github.io/vertical-tabs-explorer/"
@@ -40,6 +40,7 @@ SolidCompression=yes
 WizardStyle=modern
 ShowLanguageDialog=no
 UninstallDisplayIcon={app}\{#AppExe}
+SetupIconFile=..\src\VTabsExplorer.ico
 UninstallDisplayName={#AppName}
 LicenseFile=..\LICENSE
 CloseApplications=no

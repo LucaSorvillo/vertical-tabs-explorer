@@ -13,7 +13,8 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#202020" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f3f3f3" media="(prefers-color-scheme: light)">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23202020'/%3E%3Crect x='5' y='6' width='13' height='5' rx='1.5' fill='%23ffc83d'/%3E%3Crect x='5' y='13.5' width='13' height='5' rx='1.5' fill='%23fff' fill-opacity='.4'/%3E%3Crect x='5' y='21' width='13' height='5' rx='1.5' fill='%23fff' fill-opacity='.4'/%3E%3Crect x='20.5' y='6' width='6.5' height='20' rx='1.5' fill='%23fff' fill-opacity='.14'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/icon-32.png">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
 <script>
 (function () {
   var d = document.documentElement, l = null, c = null;
@@ -60,7 +61,7 @@
 
 <main class="content">
   <div class="bar">
-    <span class="bar-name">Vertical Tabs for File Explorer</span>
+    <span class="bar-name"><img src="assets/icon-32.png" alt="">Vertical Tabs for File Explorer</span>
     <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">Download</a>
     <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer">GitHub</a>
     <div class="lang" role="group" aria-label="Language">
@@ -70,6 +71,7 @@
   </div>
 
   <section id="overview" class="hero">
+    <img class="app-icon" src="assets/icon-128.png" width="72" height="72" alt="">
     <h1>Vertical Tabs for File Explorer</h1>
     <p class="lead" lang="en">File Explorer tabs in a column on the left, a folders bar like Chrome's bookmarks bar, and windows that come back when you reopen File Explorer.</p>
     <p class="lead" lang="it">Le schede di Esplora file in una colonna a sinistra, una barra delle cartelle come la barra dei segnalibri di Chrome, e finestre che tornano quando riapri Esplora file.</p>
@@ -80,8 +82,8 @@
       </a>
       <a class="button" href="https://github.com/LucaSorvillo/vertical-tabs-explorer"><span lang="en">Source code on GitHub</span><span lang="it">Codice sorgente su GitHub</span></a>
     </div>
-    <p class="muted" lang="en">Free and open source, MIT license. Windows 11 22H2 or later, 64-bit. Version 1.1.0.</p>
-    <p class="muted" lang="it">Gratis e open source, licenza MIT. Windows 11 22H2 o successivo, a 64 bit. Versione 1.1.0.</p>
+    <p class="muted" lang="en">Free and open source, MIT license. Windows 11 22H2 or later, 64-bit. Version 1.2.0.</p>
+    <p class="muted" lang="it">Gratis e open source, licenza MIT. Windows 11 22H2 o successivo, a 64 bit. Versione 1.2.0.</p>
     <figure>
       <img class="shot" src="assets/explorer-hero.png" width="1484" height="892" alt="File Explorer with its tabs in a column on the left and a bar of folders and groups at the top, showing a folder of photos">
     </figure>
@@ -176,12 +178,12 @@
   <section id="reopen">
     <h2 data-color="orange"><span lang="en">Reopen closed tabs</span><span lang="it">Riapri le schede chiuse</span></h2>
     <div class="prose">
-      <p lang="en">Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> to bring back the tab you just closed, as the active tab at the end of the list. If you closed a whole window, the whole window comes back with all its tabs. Press again to go further back, up to 25 times, even after a restart.</p>
-      <p lang="it">Premi <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>T</kbd> per riavere la scheda appena chiusa, come scheda attiva in fondo all'elenco. Se hai chiuso un'intera finestra, torna tutta la finestra con le sue schede. Premendo di nuovo vai a ritroso, fino a 25 volte, anche dopo un riavvio.</p>
+      <p lang="en">Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd> to bring back the tab you just closed: it returns in its place, with its color, as the active tab (with the vertical tabs on; otherwise at the end of the list). If you closed a whole window, the whole window comes back with all its tabs. Press again to go further back, up to 25 times, even after a restart.</p>
+      <p lang="it">Premi <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>T</kbd> per riavere la scheda appena chiusa: torna al suo posto, con il suo colore, come scheda attiva (con le schede verticali accese; altrimenti in fondo all'elenco). Se hai chiuso un'intera finestra, torna tutta la finestra con le sue schede. Premendo di nuovo vai a ritroso, fino a 25 volte, anche dopo un riavvio.</p>
     </div>
     <figure>
-      <img class="shot" src="assets/explorer-reopen.gif" width="960" height="575" loading="lazy" decoding="async" alt="Recording: the Travel tab is closed with its close button, then comes back, orange, at the end of the list">
-      <figcaption><span lang="en">Travel, closed with × and brought back with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>, color included.</span><span lang="it">Travel, chiusa con × e riportata con <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>T</kbd>, colore compreso.</span></figcaption>
+      <img class="shot" src="assets/explorer-reopen.gif" width="960" height="575" loading="lazy" decoding="async" alt="Recording: the Travel tab is closed with its close button, then comes back, orange, in its place">
+      <figcaption><span lang="en">Travel, closed with × and brought back in its place with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>, color included.</span><span lang="it">Travel, chiusa con × e riportata al suo posto con <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>T</kbd>, colore compreso.</span></figcaption>
     </figure>
   </section>
 
@@ -207,12 +209,12 @@
   <section id="install">
     <h2><span lang="en">Install</span><span lang="it">Installazione</span></h2>
     <ol class="steps" lang="en">
-      <li>Download <code>VTabsExplorer-1.1.0-setup.exe</code> from the <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">latest release</a>.</li>
+      <li>Download <code>VTabsExplorer-1.2.0-setup.exe</code> from the <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">latest release</a>.</li>
       <li>Run it. No administrator rights needed: it installs for your user only, in English or Italian. It asks whether to start with Windows and whether to turn on the vertical tabs and the folders bar.</li>
       <li>That's it: the app runs in the notification area, and the open File Explorer windows get the new tabs right away.</li>
     </ol>
     <ol class="steps" lang="it">
-      <li>Scarica <code>VTabsExplorer-1.1.0-setup.exe</code> dall'<a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">ultima release</a>.</li>
+      <li>Scarica <code>VTabsExplorer-1.2.0-setup.exe</code> dall'<a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">ultima release</a>.</li>
       <li>Avvialo. Non servono diritti di amministratore: si installa solo per il tuo utente, in italiano o in inglese. Chiede se avviarsi con Windows e se attivare le schede verticali e la barra delle cartelle.</li>
       <li>Fatto: l'app resta nell'area di notifica, e le finestre di Esplora file aperte prendono subito le nuove schede.</li>
     </ol>
@@ -300,7 +302,6 @@
       <details><summary>What happens if File Explorer crashes?</summary><div><p>Windows restarts it as usual. If the module was loaded, the app suspends the vertical tabs and the folders bar and tells you. Your folders come back the next time you open File Explorer.</p></div></details>
       <details><summary>Why do Windows or my antivirus warn me?</summary><div><p>The installer isn't signed yet, and loading a module into <code>explorer.exe</code> is something security tools watch closely. The code is open: you can read it and build it yourself.</p></div></details>
       <details><summary>A Windows update broke something.</summary><div><p>File Explorer's interface can change with an update. Turn the feature off from the tray menu, and <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/issues">open an issue</a> with your Windows version (<kbd>Win</kbd>+<kbd>R</kbd>, then <code>winver</code>).</p></div></details>
-      <details><summary>Why does a reopened tab go to the end?</summary><div><p>That's how reopening works for now: the tab comes back as the active one at the end of the list, and you can drag it back into place.</p></div></details>
       <details><summary>Which languages does the app speak?</summary><div><p>English and Italian. The app follows the Windows display language: Italian if Windows is in Italian, English for every other language. The installer and this website do the same.</p></div></details>
       <details><summary>How do I uninstall it?</summary><div><p><strong>Settings</strong> › <strong>Apps</strong> › <strong>Installed apps</strong> › <strong>Vertical Tabs for File Explorer</strong> › <strong>Uninstall</strong>. The uninstaller asks whether to delete your settings and saved data too. Open windows keep the vertical tabs until File Explorer restarts.</p></div></details>
     </div>
@@ -310,7 +311,6 @@
       <details><summary>Cosa succede se Esplora file si chiude per un errore?</summary><div><p>Windows lo riavvia come sempre. Se il modulo era caricato, l'app sospende le schede verticali e la barra delle cartelle e te lo dice. Le cartelle tornano la prossima volta che apri Esplora file.</p></div></details>
       <details><summary>Perché Windows o l'antivirus mi avvisano?</summary><div><p>L'installer non ha ancora una firma digitale, e caricare un modulo dentro <code>explorer.exe</code> è una cosa che i programmi di sicurezza tengono d'occhio. Il codice è aperto: puoi leggerlo e compilarlo da te.</p></div></details>
       <details><summary>Un aggiornamento di Windows ha rotto qualcosa.</summary><div><p>Un aggiornamento può cambiare l'interfaccia di Esplora file. Spegni la funzione dal menu della tray e <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/issues">apri una segnalazione</a> con la versione di Windows (<kbd>Win</kbd>+<kbd>R</kbd>, poi <code>winver</code>).</p></div></details>
-      <details><summary>Perché una scheda riaperta va in fondo?</summary><div><p>Per ora la riapertura funziona così: la scheda torna come scheda attiva in fondo all'elenco, e puoi trascinarla al suo posto.</p></div></details>
       <details><summary>In che lingua è l'app?</summary><div><p>In italiano e in inglese. L'app segue la lingua di visualizzazione di Windows: italiano se Windows è in italiano, inglese per tutte le altre lingue. Lo stesso vale per l'installazione e per questo sito.</p></div></details>
       <details><summary>Come si disinstalla?</summary><div><p><strong>Impostazioni</strong> › <strong>App</strong> › <strong>App installate</strong> › <strong>Vertical Tabs for File Explorer</strong> › <strong>Disinstalla</strong>. La disinstallazione chiede se eliminare anche impostazioni e dati salvati. Le finestre aperte tengono le schede verticali finché Esplora file non si riavvia.</p></div></details>
     </div>
