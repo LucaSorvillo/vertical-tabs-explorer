@@ -133,6 +133,13 @@ replaces two slots in vtables shared by all instances of a class (public WinRT i
   time per process (`Local\VTabsExplorer.Inject.<pid>` around "loaded? then inject"), so the DLL never has two
   references. Thread hooks of our own process pass `hMod = NULL` (with the module, user32 would hold one more).
   Every 5 s it checks that tracked processes still have the module.
+- **Work never nested in our own code** (`ThreadWork` in `ModCore.cpp`, since 1.5.1). The dispatcher can run a
+  queued job while the window thread is inside our code: a modal loop under our subclass (the window being dragged,
+  its system menu), or a `SendMessage` to another thread. Detaching a window there would destroy objects that code
+  still uses when the loop ends. Before running, each job of the module walks its own stack
+  (`RtlCaptureStackBackTrace`): if the module appears below the current call, the job runs again 100 ms later from
+  the message loop. A detach job left over from an earlier attempt does nothing if the tray started again in the
+  meantime.
 - Test mode (`dev-filter.txt`, `dev-windows.txt` in the data folder) restricts the tray app and the module to
   the windows opened by the tests. `mod-command.txt` accepts test commands addressed to one window.
 

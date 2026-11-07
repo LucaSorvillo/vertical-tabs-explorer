@@ -104,6 +104,108 @@ namespace xpx::mod
             return WaitForSingleObject(pending->done, static_cast<DWORD>(timeoutMs)) == WAIT_OBJECT_0;
         }
 
+        // L'indirizzo sta nella nostra DLL?
+        bool InOurModule(const void* address)
+        {
+            const auto* base = reinterpret_cast<const BYTE*>(g_module);
+            const auto* nt = reinterpret_cast<const IMAGE_NT_HEADERS*>(base + reinterpret_cast<const IMAGE_DOS_HEADER*>(base)->e_lfanew);
+            const auto* at = static_cast<const BYTE*>(address);
+            return at >= base && at < base + nt->OptionalHeader.SizeOfImage;
+        }
+
+        // Il nostro codice è sullo stack di questo thread SOTTO la chiamata attuale (il lavoro del dispatcher che sta girando)?
+        // Succede quando il dispatcher ci chiama dentro un'attesa o un ciclo modale del nostro stesso codice: la finestra
+        // trascinata (il ciclo di spostamento gira dentro DefSubclassProc, sotto c'è il nostro subclass, che dopo usa ancora
+        // l'oggetto), una nostra SendMessage verso un altro thread... Lì staccare o cambiare la finestra vorrebbe dire
+        // distruggere oggetti che quel codice sta usando (crash visto nel Blocco note provando lo scaricamento).
+        bool OurCodeBelowOnStack()
+        {
+            void* frames[400];
+            const USHORT count = RtlCaptureStackBackTrace(0, ARRAYSIZE(frames), frames, nullptr);
+            USHORT i = 0;
+            while (i < count && InOurModule(frames[i]))
+            {
+                ++i; // la chiamata attuale: questa funzione, chi la usa, il lavoro e il suo delegato
+            }
+            for (; i < count; ++i)
+            {
+                if (InOurModule(frames[i]))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Lavoro sul thread di un dispatcher, mai annidato nel nostro stesso codice (vedi OurCodeBelowOnStack): se il dispatcher
+        // ci chiama lì, si riprova fra 100 ms, dal ciclo dei messaggi. Il timer del nuovo tentativo tiene vivo il lavoro (e
+        // il lavoro il timer) finché non parte.
+        struct ThreadWork : std::enable_shared_from_this<ThreadWork>
+        {
+            winrt::Microsoft::UI::Dispatching::DispatcherQueue dispatcher{ nullptr };
+            std::function<void()> work;
+            winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer timer{ nullptr }; // solo dal thread del dispatcher
+            int deferrals = 0;
+
+            static bool Post(winrt::Microsoft::UI::Dispatching::DispatcherQueue const& dispatcher, DispatcherQueuePriority priority,
+                             std::function<void()> work)
+            {
+                if (!dispatcher)
+                {
+                    return false;
+                }
+                auto job = std::make_shared<ThreadWork>();
+                job->dispatcher = dispatcher;
+                job->work = std::move(work);
+                return dispatcher.TryEnqueue(priority, [job] { job->Run(); });
+            }
+
+            void Run()
+            {
+                const auto keep = shared_from_this();
+                if (timer)
+                {
+                    timer.Stop();
+                    timer = nullptr; // (rompe il giro lavoro <-> timer)
+                }
+                if (!OurCodeBelowOnStack())
+                {
+                    const std::function<void()> run = std::move(work);
+                    work = nullptr;
+                    try
+                    {
+                        run();
+                    }
+                    catch (...)
+                    {
+                        XPX_MLOG(L"Lavoro su una finestra: errore 0x%08X", static_cast<unsigned>(winrt::to_hresult()));
+                    }
+                    return;
+                }
+                // Nel registro al più una riga ogni 5 s (durante un ciclo modale lungo i lavori rimandati possono essere tanti).
+                static std::atomic<ULONGLONG> lastLogged{ 0 };
+                const ULONGLONG now = GetTickCount64();
+                if (++deferrals == 1 && now - lastLogged.load() >= 5000)
+                {
+                    lastLogged = now;
+                    XPX_MLOG(L"Lavoro su una finestra arrivato dentro il nostro stesso codice (thread %lu): rimandato di poco.", GetCurrentThreadId());
+                }
+                try
+                {
+                    timer = dispatcher.CreateTimer();
+                    timer.IsRepeating(false);
+                    timer.Interval(std::chrono::milliseconds(100));
+                    timer.Tick([keep](auto&&, auto&&) { keep->Run(); });
+                    timer.Start();
+                }
+                catch (...)
+                {
+                    timer = nullptr;
+                    XPX_MLOG(L"Lavoro su una finestra perso: timer non creato (0x%08X).", static_cast<unsigned>(winrt::to_hresult()));
+                }
+            }
+        };
+
         // Il TabView dell'intestazione di Esplora file sta dentro questo controllo.
         constexpr std::wstring_view kTabControlType = L"FileExplorerExtensions.FileExplorerTabControl";
 
@@ -409,7 +511,7 @@ namespace xpx::mod
             {
                 return;
             }
-            dispatcher.TryEnqueue(DispatcherQueuePriority::Low, [weak = winrt::make_weak(tabView)] {
+            ThreadWork::Post(dispatcher, DispatcherQueuePriority::Low, [weak = winrt::make_weak(tabView)] {
                 try
                 {
                     if (const auto found = weak.get())
@@ -539,7 +641,7 @@ namespace xpx::mod
                     return;
                 }
                 // Non dentro la catena di chiamate della feature stessa: al prossimo giro del thread.
-                locked->dispatcher.TryEnqueue([this, locked] {
+                ThreadWork::Post(locked->dispatcher, DispatcherQueuePriority::Normal, [this, locked] {
                     XPX_MLOG(L"Finestra di Esplora file chiusa (TabView %llx): risorse liberate.", locked->id);
                     ReleaseWindow(locked, /*restore*/ false);
                 });
@@ -610,7 +712,7 @@ namespace xpx::mod
     {
         for (auto const& entry : SnapshotWindows())
         {
-            entry->dispatcher.TryEnqueue([entry] {
+            ThreadWork::Post(entry->dispatcher, DispatcherQueuePriority::Normal, [entry] {
                 try
                 {
                     // Le modifiche a settings.ini arrivano a raffiche (es. comprimi e subito espandi): ogni
@@ -633,7 +735,7 @@ namespace xpx::mod
         // Solo la finestra indicata (una finestra di prova): l'albero contiene i nomi delle cartelle.
         for (auto const& entry : SnapshotWindows())
         {
-            entry->dispatcher.TryEnqueue([entry, target] {
+            ThreadWork::Post(entry->dispatcher, DispatcherQueuePriority::Normal, [entry, target] {
                 try
                 {
                     const auto tabView = entry->tabView.get();
@@ -655,7 +757,7 @@ namespace xpx::mod
     {
         for (auto const& entry : SnapshotWindows())
         {
-            entry->dispatcher.TryEnqueue([entry, command] {
+            ThreadWork::Post(entry->dispatcher, DispatcherQueuePriority::Normal, [entry, command] {
                 try
                 {
                     if (entry->verticalTabs)
@@ -722,7 +824,7 @@ namespace xpx::mod
                           list.colored.size(), list.count);
                 for (auto const& entry : SnapshotWindows())
                 {
-                    entry->dispatcher.TryEnqueue([entry, window, list] {
+                    ThreadWork::Post(entry->dispatcher, DispatcherQueuePriority::Normal, [entry, window, list] {
                         try
                         {
                             if (entry->verticalTabs)
@@ -793,9 +895,16 @@ namespace xpx::mod
                     m_seenDispatchers.push_back(entry->dispatcher);
                 }
             }
-            const bool detached = RunOnEachThread(windows, 8000, [this](std::shared_ptr<WindowEntry> const& entry, auto done) {
-                return entry->dispatcher && entry->dispatcher.TryEnqueue(DispatcherQueuePriority::High, [this, entry, done] {
-                           TeardownWindow(entry);
+            // Con ThreadWork il distacco non parte mai dentro il nostro stesso codice (per esempio la finestra trascinata: il
+            // nostro subclass è sotto il ciclo di spostamento e dopo usa ancora i suoi oggetti). Un lavoro rimasto in coda da
+            // un tentativo precedente non stacca niente se la tray nel frattempo è ripartita (epoch).
+            const int epoch = m_unloadEpoch.load();
+            const bool detached = RunOnEachThread(windows, 8000, [this, epoch](std::shared_ptr<WindowEntry> const& entry, auto done) {
+                return entry->dispatcher && ThreadWork::Post(entry->dispatcher, DispatcherQueuePriority::Normal, [this, entry, done, epoch] {
+                           if (lifetime::Unloading() && epoch == m_unloadEpoch.load())
+                           {
+                               TeardownWindow(entry);
+                           }
                            done();
                        });
             });
@@ -869,6 +978,7 @@ namespace xpx::mod
         m_tornDown = false;
         m_seenDispatchers.clear();
         m_probes.clear();
+        ++m_unloadEpoch; // un distacco ancora in coda non stacca più niente
         lifetime::g_unloading = false;
         if (!DevSwitch("noglass"))
         {

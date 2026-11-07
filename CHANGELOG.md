@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1 — 2026-11-07
+
+- Fixed: closing the app with **Exit** while a File Explorer window was being dragged, or while its system menu was
+  open, could detach the window in the middle of that and make File Explorer crash when it ended. The module now
+  waits for the window to be free (as in VTabsNotepad 1.3.0, where testing found this).
+
 ## 1.5.0 — 2026-11-07
 
 - **Exit** now removes the app from File Explorer completely: the module puts back everything it changed and

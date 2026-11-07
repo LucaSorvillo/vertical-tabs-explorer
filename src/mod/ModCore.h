@@ -87,6 +87,7 @@ namespace xpx::mod
         // Scaricamento (solo dal thread di controllo): finestre staccate e agganci tolti; code dei thread delle finestre viste
         // (per la barriera: un aggancio entrato prima del ripristino ne è uscito quando il suo thread torna al ciclo).
         bool m_tornDown = false;
+        std::atomic<int> m_unloadEpoch{ 0 }; // cresce a ogni Resume (i distacchi rimasti in coda non staccano più)
         std::vector<winrt::Microsoft::UI::Dispatching::DispatcherQueue> m_seenDispatchers;
     };
 }

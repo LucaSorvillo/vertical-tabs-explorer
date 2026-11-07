@@ -1569,7 +1569,19 @@ subito (la vecchia esce, la nuova entra) senza riavviare Esplora file.
 Prove nel processo dimostrativo (scratchpad):
 - `media\xpx-unload-test.ps1`, 3 cicli: DLL fuori in 0,5 s e processo vivo; senza la mod funzionano schede, una finestra
   nuova con Ctrl+N e UI Automation; poi la mod rientra con gli stessi colori;
-- `media\xpx-unload-edge-test.ps1`: con il menu classico aperto aspetta e poi esce; tray chiusa e subito riaperta. Per rimuovere tutto: spegnere le schede verticali,
+- `media\xpx-unload-edge-test.ps1`: con il menu classico aperto aspetta e poi esce; tray chiusa e subito riaperta.
+
+**Lavori mai annidati nel nostro codice** (1.5.1). Provando lo scaricamento nel Blocco note (1.3.0) il distacco,
+in coda nel dispatcher, è partito dentro un'attesa del nostro stesso codice e ha distrutto la colonna sotto di lui:
+crash. Qui lo stesso rischio c'era con "Esci" mentre una finestra veniva trascinata o aveva aperto il menu di
+sistema: il ciclo modale gira dentro `DefSubclassProc`, sotto c'è il nostro subclass (`MainProc`), che dopo usa
+ancora `self`; il distacco ad alta priorità arrivava lì dentro (il conteggio dei cicli modali, `ModalScope`, copre
+solo i nostri menu). Ora ogni lavoro della mod per una finestra (distacco, impostazioni, colori da rimettere,
+comandi di prova, finestre nuove) passa da `ThreadWork`: prima di partire guarda il proprio stack
+(`RtlCaptureStackBackTrace`) e, se sotto la chiamata attuale c'è la nostra DLL, riparte 100 ms dopo da un timer del
+dispatcher. Il distacco porta l'epoch dello scaricamento: rimasto in coda dopo un `Resume`, non stacca niente.
+Prova: `media\xpx-unload-sysmenu-test.ps1` (menu di sistema aperto con `SC_KEYMENU`: lo scaricamento aspetta, poi
+esce; processo vivo), più le prove di prima (15/15 e 6/6). Per rimuovere tutto: spegnere le schede verticali,
 chiudere la tray, riavviare Esplora file, togliere "Avvia con Windows", cancellare
 `%LOCALAPPDATA%\VTabsExplorer` e la cartella del progetto. Su disco Esplora file non viene mai modificato.
 
