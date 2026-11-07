@@ -68,6 +68,11 @@ Chrome. Funziona con o senza le schede verticali.
   opzioni" per il menu classico.
 - **Le cartelle di Accesso rapido si riordinano trascinandole.** L'ordine è quello di Windows: lo seguono il
   riquadro di spostamento, la Home e il menu dell'icona sulla barra delle applicazioni.
+- **Trascina una cartella da Esplora file** (o dal desktop, o da un altro programma) **sulla barra** per
+  aggiungerla ad Accesso rapido proprio lì, come un link lasciato sulla barra dei segnalibri di Chrome.
+  Lasciala al centro di un gruppo per metterla nel gruppo. I file non vengono accettati, e la cartella non
+  viene né spostata né copiata. Windows elenca al massimo 50 cartelle di Accesso rapido, e la barra mostra
+  le stesse.
 - **Gruppi**: raccolgono cartelle e altri gruppi, uno dentro l'altro senza limiti.
   - Un clic su un gruppo apre il suo elenco. Con un elenco aperto, passando su un altro gruppo si apre subito
     il suo, come in Chrome.

@@ -86,6 +86,12 @@ replaces two slots in vtables shared by all instances of a class (public WinRT i
   input.
 - `NavOrder`: moving a pinned folder calls `IAutomaticDestinationList::PinItem`, so Windows' own order (the
   navigation pane, Home, the jump list) is the bar's order read depth-first through the groups.
+- `NavDrop`: folders dragged from outside (File Explorer, the desktop, other apps). The bar's island registers an
+  OLE drop target (`RegisterDragDrop`). Only folders count: `SFGAO_FOLDER` without `SFGAO_STREAM`, so no files and
+  no `.zip` archives. The target reuses the bar's own drag logic (`HitTestScreen`, `ShowTarget`). The effect is
+  always `DROPEFFECT_LINK` (or `COPY`), never `MOVE`, so the source never moves the folder. `IDropTargetHelper`
+  keeps Windows' drag image, with a `CFSTR_DROPDESCRIPTION` text. New folders are pinned with `PinItem` before
+  the next pinned folder (`NavItems::PinFolders`), then placed like a bar drag once the next reading includes them.
 - `NavGroups`: one store per process, immutable versioned snapshots, saved to `navbar-groups.json`.
 - `ModernMenu`: the Windows 11 context menu, opened the way the navigation pane opens it, through the
   "File Explorer Context Menu" presenter of `Windows.UI.FileExplorer.dll`. These interfaces are undocumented

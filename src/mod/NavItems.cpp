@@ -269,6 +269,80 @@ namespace xpx::mod
         Refresh();
     }
 
+    void NavItems::PinFolders(NavPin pin)
+    {
+        if (pin.items.empty())
+        {
+            return;
+        }
+        {
+            std::scoped_lock lock(m_lock);
+            m_pins.push_back(std::move(pin));
+        }
+        Refresh();
+    }
+
+    void NavItems::DoPin(NavPin const& pin)
+    {
+        const ULONGLONG start = GetTickCount64();
+        com_ptr<IAutomaticDestinationList> list;
+        HRESULT result = CoCreateInstance(kAutomaticDestinationList, nullptr, CLSCTX_INPROC_SERVER, __uuidof(IAutomaticDestinationList), list.put_void());
+        if (SUCCEEDED(result))
+        {
+            result = list->Initialize(kExplorerAppId, nullptr, nullptr);
+        }
+        if (FAILED(result))
+        {
+            XPX_MLOG(L"NavItems: elenco di Accesso rapido non disponibile, cartelle non aggiunte (0x%08X).", static_cast<unsigned>(result));
+            return;
+        }
+        const auto anchor = ItemOf(pin.before);
+        size_t added = 0;
+        size_t already = 0;
+        size_t failed = 0;
+        HRESULT lastFailure = S_OK;
+        for (auto const& idList : pin.items)
+        {
+            const auto item = ItemOf(idList);
+            int index = -1;
+            if (!item)
+            {
+                ++failed;
+                continue;
+            }
+            if (SUCCEEDED(list->IsPinned(item.get(), &index)) && index >= 0)
+            {
+                ++already; // la sposta la barra, se serve
+                continue;
+            }
+            // Prima della cartella indicata (il suo indice cresce a ogni aggiunta: le nuove restano nel loro ordine), altrimenti
+            // in fondo: l'indice uguale al numero delle aggiunte (vedi IAutomaticDestinationList).
+            int to = -1;
+            if (!anchor || FAILED(list->IsPinned(anchor.get(), &to)) || to < 0)
+            {
+                to = 0;
+                com_ptr<IObjectArray> pinned;
+                UINT count = 0;
+                if (SUCCEEDED(list->GetList(0, 1000, 0, IID_PPV_ARGS(pinned.put()))) && pinned && SUCCEEDED(pinned->GetCount(&count)))
+                {
+                    to = static_cast<int>(count);
+                }
+            }
+            const HRESULT pinnedResult = list->PinItem(item.get(), to);
+            if (SUCCEEDED(pinnedResult))
+            {
+                ++added;
+            }
+            else
+            {
+                ++failed;
+                lastFailure = pinnedResult;
+            }
+        }
+        XPX_MLOG(L"NavItems: %zu %s ad Accesso rapido (già aggiunte %zu, non riuscite %zu: 0x%08X), %llu ms.", added,
+                 added == 1 ? L"cartella aggiunta" : L"cartelle aggiunte", already, failed, static_cast<unsigned>(lastFailure), GetTickCount64() - start);
+    }
+
     void NavItems::DoMove(NavMove const& move)
     {
         const ULONGLONG start = GetTickCount64();
@@ -363,9 +437,16 @@ namespace xpx::mod
                     RemovePropW(hwnd, L"VTabsExplorer.NavItems.Dirty");
                 }
                 std::vector<NavMove> moves;
+                std::vector<NavPin> pins;
                 {
                     std::scoped_lock lock(m_lock);
                     moves.swap(m_moves);
+                    pins.swap(m_pins);
+                }
+                // Prima le cartelle nuove (uno spostamento chiesto dopo può riguardarle), poi gli spostamenti.
+                for (auto const& pin : pins)
+                {
+                    DoPin(pin);
                 }
                 for (auto const& move : moves)
                 {
@@ -373,7 +454,7 @@ namespace xpx::mod
                 }
                 // Dopo uno spostamento si pubblica comunque: la barra lo ha già fatto a vista, e se non è
                 // riuscito deve tornare all'ordine vero.
-                m_forcePublish = m_forcePublish || !moves.empty();
+                m_forcePublish = m_forcePublish || !moves.empty() || !pins.empty();
                 Load();
                 lastLoad = GetTickCount64();
             }

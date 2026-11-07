@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 — 2026-11-07
+
+- Folders bar: drag a folder from File Explorer (or the desktop, or another app) onto the bar to pin it to Quick
+  Access right there, like a link dropped on Chrome's bookmarks bar. Dropped on the middle of a group, it goes into
+  the group. A folder already in Quick Access moves there instead. The bar shows a line where the folder will go,
+  and "Pin to Quick access" (or "Add to <group>") next to the dragged image. Files aren't accepted, and the dragged
+  folder is never moved or copied.
+
 ## 1.2.0 — 2026-11-06
 
 - <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>: the reopened tab comes back in its place, like in VTabsNotepad (with the

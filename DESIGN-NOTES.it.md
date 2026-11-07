@@ -529,6 +529,28 @@ facoltativa e protetta (vedi "Sicurezza della mod").
     `TrackPopupMenuEx`, senza "Crea collegamento". "Apri" resta, perché il riquadro la sostituisce con
     "Espandi". I messaggi dei sottomenu disegnati dalla shell passano dal subclass della finestra principale
     a `IContextMenu3`.
+  - **Cartelle trascinate da fuori** (`NavDrop.cpp`, dalla 1.3.0), come un link sulla barra dei segnalibri di
+    Chrome:
+    - l'isola della barra ha un bersaglio OLE (`RegisterDragDrop`; il ponte dell'isola di WinUI non ne aveva
+      uno suo). Il trascinamento XAML non arriva alle isole aggiunte da noi, un bersaglio OLE sì;
+    - dall'oggetto trascinato (`SHCreateShellItemArrayFromDataObject`) valgono solo le cartelle: `SFGAO_FOLDER`
+      senza `SFGAO_STREAM`, quindi niente file né archivi .zip;
+    - il bersaglio è quello del trascinamento interno (`HitTestScreen`, `ShowTarget`): la linea nel blocco
+      delle cartelle aggiunte, il gruppo evidenziato sul suo quarto centrale. Gli elenchi non si aprono,
+      perché sono finestre a parte senza bersaglio;
+    - l'effetto è `DROPEFFECT_LINK` (o `COPY` se la sorgente non ammette il collegamento), mai `MOVE`:
+      Esplora file sposterebbe la cartella;
+    - l'immagine del trascinamento di Windows resta anche sopra la barra (`IDropTargetHelper`). Accanto c'è
+      "Aggiungi ad Accesso rapido" o "Aggiungi a <gruppo>" (`CFSTR_DROPDESCRIPTION`), tolto uscendo e al
+      rilascio;
+    - al rilascio una cartella già aggiunta si sposta lì (`PlaceNode`, come dalla barra). Le nuove si
+      aggiungono dal thread delle letture (`NavItems::PinFolders`) con `IAutomaticDestinationList::PinItem`,
+      prima della prima cartella aggiunta dal punto di rilascio in poi; in fondo se non ce n'è, e per i
+      gruppi. Quando la lettura nuova le porta (entro 15 s) vanno al loro posto con `PlaceNode`: nel gruppo,
+      o accanto a un gruppo, e l'ordine di Windows segue come per i riordini;
+    - Windows elenca al più **50 cartelle aggiunte** (Accesso rapido e "Posizioni frequenti", da cui legge la
+      barra; provato con 55 aggiunte, tutte raggiungibili: 50 elencate). Oltre, le ultime non si vedono, nella
+      barra come nel riquadro di sistema e nella Home.
   - **Gruppi** (`NavGroups.cpp`, `NavBar.cpp`):
     - le voci si riconoscono da una chiave: `f:` più il nome di analisi in minuscolo per le cartelle,
       `g:` più un numero per i gruppi. Un gruppo ha nome e contenuto (chiavi, in ordine); una cartella sta
@@ -1441,8 +1463,22 @@ thread vivo dopo la chiusura) e `Measure-ThreadLeak.ps1` (apre e chiude una fine
 explorer.exe separato per ogni configurazione, es. `-Configs 'vt+nav', 'none'`, e conta i thread rimasti vivi:
 ora 0 in tutte). Strumento per gli stack: `tools\stackdump\stackdump.cpp` (istruzioni in testa al file).
 
+**Cartelle trascinate da fuori sulla barra** (2026-11-07, 1.3.0): prova con il mouse vero nella finestra
+dimostrativa (explorer.exe separato, `C:\VTabs Demo`), dalla vista dei file alla barra:
+- cartella nuova tra due cartelle aggiunte: aggiunta lì;
+- al centro di un gruppo: dentro;
+- prima di un gruppo: inizio del blocco;
+- un file: rifiutato, con il cursore di divieto;
+- una cartella già aggiunta: spostata, non aggiunta di nuovo.
+
+Le cartelle trascinate restano dove sono (stesso numero di elementi), il registro non ha errori e le fissate
+dell'utente sono identiche dopo la prova (impronta). In modalità dimostrativa l'ordine di Windows non si tocca: una
+cartella già aggiunta spostata al primo livello lascia i gruppi ancorati alle cartelle di prima, come il
+trascinamento dalla barra. Fuori dalla modalità dimostrativa l'ordine di Windows segue.
+
 Limiti delle schede verticali: trascinare un file sopra una riga per spostarlo in quella scheda non
-funziona (il trascinamento OLE non raggiunge un'isola XAML aggiunta da noi, come in VTabsNotepad); una
+funziona (il trascinamento XAML non raggiunge un'isola XAML aggiunta da noi, come in VTabsNotepad; un
+bersaglio OLE registrato sull'isola sì, lo usa la barra delle cartelle dalla 1.3.0, ma per le righe non c'è); una
 scheda non si stacca in una nuova finestra trascinandola; la prima finestra dopo l'avvio di Esplora file
 mostra le schede orizzontali per un paio di secondi, finché la tray non vi porta la mod.
 

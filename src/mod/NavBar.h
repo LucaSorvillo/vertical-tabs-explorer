@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ModernMenu.h"
+#include "NavDrop.h"
 #include "NavGroups.h"
 #include "NavItems.h"
 
@@ -31,6 +32,10 @@ namespace xpx::mod
     // all'altro; lasciati al centro di un gruppo ci entrano, e fermandosi sopra un gruppo (o su "»") il suo elenco
     // si apre, anche al posto di quello da cui parte la voce (come Chrome: la si lascia dove si vuole nel gruppo). L'ordine delle cartelle che restano al primo livello è quello di Windows (NavItems::MovePinned):
     // la barra lo cambia quando serve, il resto lo ricorda NavGroups.
+    //
+    // Cartelle trascinate da fuori (Esplora file, il desktop, un altro programma), come i link sulla barra dei segnalibri
+    // di Chrome: lasciate nella barra si aggiungono ad Accesso rapido in quel punto, lasciate al centro di un gruppo ci
+    // entrano (NavDrop.h; bersaglio OLE dell'isola, vedi OnExternalDragEnter).
     //
     // Una NOSTRA isola XAML (DesktopWindowXamlSource, Mica Alt come la barra del titolo) che WindowLayout
     // mette tra l'intestazione e il contenuto. Vive e si usa sul thread UI della finestra (la possiede
@@ -67,6 +72,14 @@ namespace xpx::mod
         // voci: in fondo), "navbar info". Per i gruppi (per nome; "f:<nome>" una cartella, "g:<nome>" un gruppo):
         // vedi DevGroupCommand in NavBar.cpp.
         void DevCommand(std::wstring const& command);
+
+        // Trascinamento da fuori, dal bersaglio OLE dell'isola (NavDrop.cpp), sul thread della finestra. Restituiscono
+        // l'effetto: DROPEFFECT_LINK (o COPY se la sorgente non ammette il collegamento), mai MOVE: Esplora file sposterebbe
+        // la cartella. Gli elenchi non si aprono (finestre a parte, senza bersaglio): si lascia nella barra o su un gruppo.
+        DWORD OnExternalDragEnter(IDataObject* data, POINT screen, DWORD allowed);
+        DWORD OnExternalDragOver(POINT screen, DWORD allowed);
+        void OnExternalDragLeave();
+        DWORD OnExternalDrop(IDataObject* data, POINT screen, DWORD allowed);
 
     private:
         struct Level;
@@ -271,6 +284,31 @@ namespace xpx::mod
         void ClearTargetVisuals(DropTarget const& target);
         void AttachDragHandlers(winrt::Microsoft::UI::Xaml::UIElement const& holder);
 
+        // --- cartelle trascinate da fuori ---
+        struct ExternalDrag
+        {
+            bool active = false;                 // un trascinamento da fuori è sopra la barra
+            std::vector<DroppedFolder> folders;  // le sue cartelle (vuoto: niente da aggiungere)
+            winrt::com_ptr<IDataObject> data;    // per la descrizione accanto all'immagine
+            std::wstring described;              // descrizione messa ("" = nessuna)
+        };
+        // Cartella appena aggiunta da un trascinamento: quando la lettura nuova la porta va nel posto scelto (in un gruppo, o
+        // accanto a un gruppo), e l'ordine di Windows segue, come trascinandola dalla barra.
+        struct PendingDrop
+        {
+            std::wstring key;
+            std::wstring container;
+            std::wstring before;
+            ULONGLONG until = 0;
+        };
+        DWORD ExternalEffect(DropTarget const& target, DWORD allowed) const;
+        void DescribeExternal(DropTarget const& target, DWORD effect);
+        void DropFolders(std::vector<DroppedFolder> const& folders, DropTarget const& target);
+        // Cartella aggiunta prima della quale va, nell'ordine di Windows, una cartella lasciata prima di "before" al primo
+        // livello: la prima cartella da lì in poi (vuoto: in fondo).
+        std::vector<uint8_t> WindowsAnchorFor(std::wstring const& before) const;
+        void PlacePendingDrops();
+
         void DevGroupCommand(std::wstring const& command);
         std::wstring KeyByName(std::wstring const& reference) const;
 
@@ -301,6 +339,9 @@ namespace xpx::mod
         size_t m_blockFirst = 0; // blocco delle cartelle aggiunte e dei gruppi: voci [m_blockFirst, m_blockEnd)
         size_t m_blockEnd = 0;
         Drag m_drag;
+        ExternalDrag m_external;
+        std::vector<PendingDrop> m_pendingDrops;
+        winrt::com_ptr<IDropTarget> m_dropTarget; // registrato sull'isola (RegisterDragDrop)
         int m_iconPixels = 0;
         bool m_wasForeground = false;
         ULONGLONG m_lastActivationRefresh = 0;

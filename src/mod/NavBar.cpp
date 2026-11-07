@@ -51,6 +51,9 @@ namespace xpx::mod
         constexpr UINT kExtraFirstId = 0x7F00;
         constexpr UINT kExtraLastId = 0x7FFF;
         constexpr size_t kOpenAllConfirm = 15;           // "Apri tutte" con più cartelle chiede conferma (come Chrome)
+        // Cartella trascinata da fuori e aggiunta ad Accesso rapido: entro questo tempo la lettura nuova la porta nella barra,
+        // che la mette nel posto scelto; poi si rinuncia (aggiunta non riuscita, o cartella fuori dalla modalità dimostrativa).
+        constexpr ULONGLONG kPendingDropMs = 15'000;
         // Icona dei gruppi: due cartelle sovrapposte, solo contorno (16x16, tratto di 1 DIP), come le icone della
         // barra dei comandi: la cartella davanti intera, di quella dietro solo la parte che si vede.
         constexpr wchar_t kGroupIconData[] =
@@ -569,6 +572,24 @@ namespace xpx::mod
         // Durante un trascinamento il puntatore è catturato dalla radice della barra o dell'elenco.
         AttachDragHandlers(m_root);
 
+        // Cartelle trascinate da fuori (Esplora file, il desktop...): bersaglio OLE dell'isola. Se il ponte dell'isola ne ha già
+        // uno (quello di WinUI per il trascinamento XAML, che la barra non usa) lo si sostituisce.
+        m_dropTarget = MakeNavDropTarget(weak, m_hwnd);
+        HRESULT dropResult = m_dropTarget ? RegisterDragDrop(m_hwnd, m_dropTarget.get()) : E_OUTOFMEMORY;
+        bool replaced = false;
+        if (dropResult == DRAGDROP_E_ALREADYREGISTERED)
+        {
+            RevokeDragDrop(m_hwnd);
+            dropResult = RegisterDragDrop(m_hwnd, m_dropTarget.get());
+            replaced = true;
+        }
+        if (FAILED(dropResult))
+        {
+            m_dropTarget = nullptr;
+        }
+        XPX_MLOG(L"NavBar: cartelle trascinabili da fuori sulla barra: 0x%08X%s.", static_cast<unsigned>(dropResult),
+                 replaced ? L" (sostituito il bersaglio che il ponte dell'isola aveva già)" : L"");
+
         m_iconPixels = IconPixels();
         m_groups = NavGroups::Instance().Latest();
         NavItems::Instance().UseIconSize(m_iconPixels);
@@ -620,6 +641,16 @@ namespace xpx::mod
                 m_nameEditor.Hide();
             }
         });
+        if (m_dropTarget)
+        {
+            if (m_hwnd && IsWindow(m_hwnd))
+            {
+                RevokeDragDrop(m_hwnd);
+            }
+            m_dropTarget = nullptr;
+        }
+        m_external = {};
+        m_pendingDrops.clear();
         if (m_hwnd && IsWindow(m_hwnd))
         {
             RemovePropW(m_hwnd, kNavBarProp);
@@ -697,6 +728,8 @@ namespace xpx::mod
                 }
             }
         }
+        // Cartelle appena aggiunte trascinandole da fuori: quando la lettura le porta, al loro posto.
+        PlacePendingDrops();
         // Finestra appena attivata: si rilegge (una cartella può essere stata aggiunta o tolta altrove).
         const bool foreground = GetForegroundWindow() == m_main;
         const ULONGLONG now = GetTickCount64();
@@ -3471,6 +3504,216 @@ namespace xpx::mod
             if (level->marker)
             {
                 level->marker.Visibility(mux::Visibility::Collapsed);
+            }
+        }
+    }
+
+    // --- Cartelle trascinate da fuori ------------------------------------------------------------------------
+    // Da Esplora file, dal desktop o da un altro programma, come un link sulla barra dei segnalibri di Chrome: la linea
+    // segna il posto (al primo livello solo nel blocco delle cartelle aggiunte), il gruppo sotto il puntatore si evidenzia
+    // se la cartella ci andrà dentro, e accanto all'immagine del trascinamento compare "Aggiungi ad Accesso rapido" (o
+    // "Aggiungi a <gruppo>"). Al rilascio la cartella si aggiunge ad Accesso rapido in quel posto; una già aggiunta si
+    // sposta lì. Gli elenchi non si aprono: sono finestre a parte, dove il trascinamento non arriva alla barra.
+
+    DWORD NavBar::OnExternalDragEnter(IDataObject* data, POINT screen, DWORD allowed)
+    {
+        OnExternalDragLeave();
+        if (!m_root || m_drag.armed || m_menuOpen)
+        {
+            return DROPEFFECT_NONE; // un trascinamento della barra, o un menu modale, in corso
+        }
+        m_external.active = true;
+        m_external.folders = FoldersOf(data);
+        m_external.data.copy_from(data);
+        CloseLevels(0);
+        m_drag = {};
+        // Una sola cartella già nella barra: lasciata accanto a sé stessa non si sposta (come trascinandola dalla barra).
+        if (m_external.folders.size() == 1)
+        {
+            m_drag.key = m_external.folders.front().key;
+        }
+        XPX_MLOG(L"NavBar: trascinamento da fuori sopra la barra (%zu %s).", m_external.folders.size(),
+                 m_external.folders.size() == 1 ? L"cartella" : L"cartelle");
+        return OnExternalDragOver(screen, allowed);
+    }
+
+    DWORD NavBar::OnExternalDragOver(POINT screen, DWORD allowed)
+    {
+        if (!m_external.active || m_external.folders.empty() || !m_root)
+        {
+            return DROPEFFECT_NONE;
+        }
+        DropTarget target = HitTestScreen(screen);
+        if (target.level >= 0)
+        {
+            target = {}; // (con gli elenchi chiusi non succede: solo la barra)
+        }
+        target.hover = nullptr; // da fuori gli elenchi non si aprono
+        target.hoverAnchor = nullptr;
+        ShowTarget(target);
+        const DWORD effect = ExternalEffect(target, allowed);
+        DescribeExternal(target, effect);
+        return effect;
+    }
+
+    void NavBar::OnExternalDragLeave()
+    {
+        if (!m_external.active)
+        {
+            return;
+        }
+        if (!m_external.described.empty())
+        {
+            SetDropDescription(m_external.data.get(), DROPIMAGE_INVALID, {}, {});
+        }
+        ClearTargetVisuals(m_drag.target);
+        m_drag = {};
+        m_external = {};
+    }
+
+    DWORD NavBar::OnExternalDrop(IDataObject* data, POINT screen, DWORD allowed)
+    {
+        if (!m_external.active)
+        {
+            OnExternalDragEnter(data, screen, allowed); // (rilascio senza ingresso: per sicurezza si rifà tutto)
+        }
+        const DWORD effect = OnExternalDragOver(screen, allowed);
+        const DropTarget target = m_drag.target;
+        const std::vector<DroppedFolder> folders = m_external.folders;
+        OnExternalDragLeave(); // linea, evidenziazione e descrizione via
+        if (effect == DROPEFFECT_NONE || !target.valid || folders.empty())
+        {
+            XPX_MLOG(L"NavBar: trascinamento da fuori lasciato fuori posto, o senza cartelle: nulla aggiunto.");
+            return DROPEFFECT_NONE;
+        }
+        DropFolders(folders, target);
+        return effect;
+    }
+
+    DWORD NavBar::ExternalEffect(DropTarget const& target, DWORD allowed) const
+    {
+        if (!target.valid)
+        {
+            return DROPEFFECT_NONE;
+        }
+        // Un collegamento (come "Aggiungi ad Accesso rapido"); copia solo se la sorgente non lo ammette. Mai spostamento.
+        if (allowed & DROPEFFECT_LINK)
+        {
+            return DROPEFFECT_LINK;
+        }
+        return (allowed & DROPEFFECT_COPY) ? DROPEFFECT_COPY : DROPEFFECT_NONE;
+    }
+
+    void NavBar::DescribeExternal(DropTarget const& target, DWORD effect)
+    {
+        std::wstring wanted;
+        std::wstring group;
+        if (effect != DROPEFFECT_NONE)
+        {
+            if (target.into)
+            {
+                const NavGroup* found = m_groups ? m_groups->Find(target.container) : nullptr;
+                group = found ? found->name : std::wstring{};
+                wanted = L"g:" + target.container + L"|" + group;
+            }
+            else
+            {
+                wanted = L"top";
+            }
+            wanted += effect == DROPEFFECT_LINK ? L"|link" : L"|copy";
+        }
+        if (wanted == m_external.described)
+        {
+            return;
+        }
+        m_external.described = wanted;
+        const DROPIMAGETYPE image = effect == DROPEFFECT_LINK ? DROPIMAGE_LINK : DROPIMAGE_COPY;
+        if (wanted.empty())
+        {
+            SetDropDescription(m_external.data.get(), DROPIMAGE_INVALID, {}, {});
+        }
+        else if (target.into)
+        {
+            SetDropDescription(m_external.data.get(), image, Tr(L"Add to %1", L"Aggiungi a %1"), group);
+        }
+        else
+        {
+            SetDropDescription(m_external.data.get(), image, Tr(L"Pin to Quick access", L"Aggiungi ad Accesso rapido"), {});
+        }
+    }
+
+    void NavBar::DropFolders(std::vector<DroppedFolder> const& folders, DropTarget const& target)
+    {
+        const std::wstring container = target.container; // "" = primo livello
+        const std::wstring before = target.into ? std::wstring{} : target.before;
+        NavPin pin;
+        if (container.empty())
+        {
+            pin.before = WindowsAnchorFor(before);
+        }
+        size_t moved = 0;
+        const ULONGLONG until = GetTickCount64() + kPendingDropMs;
+        for (auto const& folder : folders)
+        {
+            if (IsDraggable(folder.key))
+            {
+                moved += PlaceNode(folder.key, container, before) ? 1 : 0; // già aggiunta: si sposta lì
+                continue;
+            }
+            pin.items.push_back(folder.idList);
+            m_pendingDrops.push_back(PendingDrop{ folder.key, container, before, until });
+        }
+        const size_t fresh = pin.items.size();
+        NavItems::Instance().PinFolders(std::move(pin));
+        XPX_MLOG(L"NavBar: %zu %s da fuori %s: %zu da aggiungere ad Accesso rapido, %zu già aggiunte spostate.", folders.size(),
+                 folders.size() == 1 ? L"cartella lasciata" : L"cartelle lasciate", container.empty() ? L"nella barra" : L"in un gruppo", fresh, moved);
+    }
+
+    std::vector<uint8_t> NavBar::WindowsAnchorFor(std::wstring const& before) const
+    {
+        if (before.empty() || !m_snapshot)
+        {
+            return {};
+        }
+        bool reached = false;
+        for (size_t e = m_blockFirst; e < m_blockEnd && e < m_entries.size(); ++e)
+        {
+            reached = reached || m_entries[e].key == before;
+            if (reached && IsFolderKey(m_entries[e].key))
+            {
+                if (const auto item = ItemOf(m_entries[e].key); item && m_snapshot->items[*item].pinned)
+                {
+                    return m_snapshot->items[*item].idList;
+                }
+            }
+        }
+        return {};
+    }
+
+    void NavBar::PlacePendingDrops()
+    {
+        if (m_pendingDrops.empty() || m_drag.armed || m_external.active)
+        {
+            return;
+        }
+        const ULONGLONG now = GetTickCount64();
+        std::vector<PendingDrop> pending;
+        pending.swap(m_pendingDrops);
+        for (auto& drop : pending)
+        {
+            if (IsDraggable(drop.key))
+            {
+                // Nel gruppo, o accanto a un gruppo, e l'ordine di Windows come la barra: come trascinandola dalla barra.
+                const bool placed = PlaceNode(drop.key, drop.container, drop.before);
+                XPX_MLOG(L"NavBar: cartella trascinata da fuori ora nella barra%s.", placed ? L", messa al suo posto" : L" (già al suo posto)");
+            }
+            else if (now < drop.until)
+            {
+                m_pendingDrops.push_back(std::move(drop));
+            }
+            else
+            {
+                XPX_MLOG(L"NavBar: cartella trascinata da fuori non comparsa in Accesso rapido entro %llu s.", kPendingDropMs / 1000);
             }
         }
     }

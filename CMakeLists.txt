@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(VTabsExplorer VERSION 1.2.0 LANGUAGES CXX RC)
+project(VTabsExplorer VERSION 1.3.0 LANGUAGES CXX RC)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "VTabsExplorer va compilato a 64 bit (x64).")
@@ -35,6 +35,7 @@ add_library(VTabsExplorerMod SHARED
     src/mod/ModSettings.cpp
     src/mod/ModernMenu.cpp
     src/mod/NavBar.cpp
+    src/mod/NavDrop.cpp
     src/mod/NavGroups.cpp
     src/mod/NavItems.cpp
     src/mod/NavOrder.cpp

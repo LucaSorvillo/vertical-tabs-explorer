@@ -48,6 +48,14 @@ namespace xpx::mod
         std::vector<uint8_t> after;
     };
 
+    // Cartelle da aggiungere ad Accesso rapido (PIDL assoluti), nell'ordine, prima della cartella aggiunta "before"
+    // (vuoto, o non più aggiunta: in fondo), come trascinate nella barra. Quelle già aggiunte restano dove sono.
+    struct NavPin
+    {
+        std::vector<std::vector<uint8_t>> items;
+        std::vector<uint8_t> before;
+    };
+
     class NavItems
     {
     public:
@@ -65,17 +73,22 @@ namespace xpx::mod
         // Home e del jump list di Esplora file). Lo fa il thread delle letture, poi rilegge e pubblica comunque
         // una versione nuova (le finestre che hanno già spostato la voce a vista si rimettono in pari).
         void MovePinned(NavMove move);
+        // Aggiunge cartelle ad Accesso rapido (come "Aggiungi ad Accesso rapido", nel posto indicato). Come MovePinned: lo
+        // fa il thread delle letture (prima degli spostamenti in attesa), poi rilegge e pubblica una versione nuova.
+        void PinFolders(NavPin pin);
 
     private:
         NavItems() = default;
         void Run();
         void Load();
         void DoMove(NavMove const& move);
+        void DoPin(NavPin const& pin);
 
         mutable std::mutex m_lock;
         std::shared_ptr<const NavSnapshot> m_latest;
         std::vector<int> m_sizes;
         std::vector<NavMove> m_moves; // in attesa del thread delle letture
+        std::vector<NavPin> m_pins;   // in attesa del thread delle letture
         HANDLE m_wake = nullptr;
         bool m_started = false;
         bool m_forcePublish = false; // solo dal thread delle letture

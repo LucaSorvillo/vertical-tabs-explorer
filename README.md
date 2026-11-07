@@ -67,6 +67,10 @@ without the vertical tabs.
   options" for the classic menu.
 - **Drag your Quick Access folders** to reorder them. The order is Windows' own: the navigation pane, Home
   and the taskbar jump list follow it.
+- **Drag a folder from File Explorer** (or from the desktop, or another app) **onto the bar** to pin it to
+  Quick Access right there, like a link dropped on Chrome's bookmarks bar. Drop it on the middle of a group to
+  put it in that group. Files aren't accepted, and the folder itself isn't moved or copied. Windows lists at
+  most 50 Quick Access folders, and the bar shows the same ones.
 - **Groups**: collect folders and other groups, nested as deep as you like.
   - Click a group to open its list. Once a list is open, hovering another group switches to it at once, like
     in Chrome.
