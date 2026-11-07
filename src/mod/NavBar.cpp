@@ -3534,8 +3534,8 @@ namespace xpx::mod
     // --- Cartelle trascinate da fuori ------------------------------------------------------------------------
     // Da Esplora file, dal desktop o da un altro programma, come un link sulla barra dei segnalibri di Chrome: la linea
     // segna il posto (al primo livello solo nel blocco delle cartelle aggiunte), il gruppo sotto il puntatore si evidenzia
-    // se la cartella ci andrà dentro, e accanto all'immagine del trascinamento compare "Aggiungi ad Accesso rapido" (o
-    // "Aggiungi a <gruppo>"). Al rilascio la cartella si aggiunge ad Accesso rapido in quel posto; una già aggiunta si
+    // se la cartella ci andrà dentro, e accanto all'immagine del trascinamento compare "Aggiungi ad Accesso rapido" (anche
+    // sopra un gruppo, come Windows). Al rilascio la cartella si aggiunge ad Accesso rapido in quel posto; una già aggiunta si
     // sposta lì. Fermi su un gruppo (o su "»") il suo elenco si apre come trascinando dalla barra: la finestra dell'elenco
     // riceve lo stesso bersaglio OLE (AttachLevelDropTargets), e passando dalla barra all'elenco il trascinamento continua.
     // Al rilascio, o uscendo da barra ed elenchi, gli elenchi si chiudono (come Chrome).
@@ -3610,7 +3610,7 @@ namespace xpx::mod
         const DropTarget target = HitTestScreen(screen);
         ShowTarget(target);
         const DWORD effect = ExternalEffect(target, allowed);
-        DescribeExternal(target, effect);
+        DescribeExternal(effect);
         return effect;
     }
 
@@ -3664,43 +3664,22 @@ namespace xpx::mod
         return (allowed & DROPEFFECT_COPY) ? DROPEFFECT_COPY : DROPEFFECT_NONE;
     }
 
-    void NavBar::DescribeExternal(DropTarget const& target, DWORD effect)
+    void NavBar::DescribeExternal(DWORD effect)
     {
-        std::wstring wanted;
-        std::wstring group;
-        if (effect != DROPEFFECT_NONE)
-        {
-            // Sul gruppo o nel suo elenco: "Aggiungi a <gruppo>"; nella barra o nell'elenco "»": "Aggiungi ad Accesso rapido".
-            if (!target.container.empty())
-            {
-                const NavGroup* found = m_groups ? m_groups->Find(target.container) : nullptr;
-                group = found ? found->name : std::wstring{};
-                wanted = L"g:" + target.container + L"|" + group;
-            }
-            else
-            {
-                wanted = L"top";
-            }
-            wanted += effect == DROPEFFECT_LINK ? L"|link" : L"|copy";
-        }
+        // Sempre il testo di Windows, anche sopra un gruppo o nel suo elenco (scelta dell'utente: niente "Aggiungi a <gruppo>").
+        const std::wstring wanted = effect == DROPEFFECT_NONE ? std::wstring{} : effect == DROPEFFECT_LINK ? L"link" : L"copy";
         if (wanted == m_external.described)
         {
             return;
         }
         m_external.described = wanted;
-        const DROPIMAGETYPE image = effect == DROPEFFECT_LINK ? DROPIMAGE_LINK : DROPIMAGE_COPY;
         if (wanted.empty())
         {
             SetDropDescription(m_external.data.get(), DROPIMAGE_INVALID, {}, {});
+            return;
         }
-        else if (!target.container.empty())
-        {
-            SetDropDescription(m_external.data.get(), image, Tr(L"Add to %1", L"Aggiungi a %1"), group);
-        }
-        else
-        {
-            SetDropDescription(m_external.data.get(), image, Tr(L"Pin to Quick access", L"Aggiungi ad Accesso rapido"), {});
-        }
+        SetDropDescription(m_external.data.get(), effect == DROPEFFECT_LINK ? DROPIMAGE_LINK : DROPIMAGE_COPY,
+                           Tr(L"Pin to Quick access", L"Aggiungi ad Accesso rapido"), {});
     }
 
     void NavBar::DropFolders(std::vector<DroppedFolder> const& folders, DropTarget const& target)

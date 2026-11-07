@@ -555,8 +555,9 @@ facoltativa e protetta (vedi "Sicurezza della mod").
     - l'effetto è `DROPEFFECT_LINK` (o `COPY` se la sorgente non ammette il collegamento), mai `MOVE`:
       Esplora file sposterebbe la cartella;
     - l'immagine del trascinamento di Windows resta anche sopra la barra (`IDropTargetHelper`). Accanto c'è
-      "Aggiungi ad Accesso rapido" o "Aggiungi a <gruppo>" (`CFSTR_DROPDESCRIPTION`), tolto uscendo e al
-      rilascio;
+      "Aggiungi ad Accesso rapido" (`CFSTR_DROPDESCRIPTION`), tolto uscendo e al rilascio. Dalla 1.4.1 è sempre
+      quello, anche sopra un gruppo o nel suo elenco: l'utente preferisce il testo classico di Windows a
+      "Aggiungi a <gruppo>" (1.3.0 e 1.4.0);
     - al rilascio una cartella già aggiunta si sposta lì (`PlaceNode`, come dalla barra). Le nuove si
       aggiungono dal thread delle letture (`NavItems::PinFolders`) con `IAutomaticDestinationList::PinItem`,
       prima della prima cartella aggiunta dal punto di rilascio in poi; in fondo se non ce n'è, e per i

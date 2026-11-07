@@ -311,7 +311,8 @@ namespace xpx::mod
             ULONGLONG until = 0;
         };
         DWORD ExternalEffect(DropTarget const& target, DWORD allowed) const;
-        void DescribeExternal(DropTarget const& target, DWORD effect);
+        // Il testo accanto all'immagine del trascinamento: sempre "Aggiungi ad Accesso rapido", come Windows.
+        void DescribeExternal(DWORD effect);
         void DropFolders(std::vector<DroppedFolder> const& folders, DropTarget const& target);
         // Cartella aggiunta prima della quale va, nell'ordine di Windows, una cartella lasciata prima di "before" al primo
         // livello: la prima cartella da lì in poi (vuoto: in fondo).

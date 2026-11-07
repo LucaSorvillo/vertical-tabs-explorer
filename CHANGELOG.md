@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.1 — 2026-11-07
+
+- Folders bar: the text next to a folder dragged in from outside is always the classic "Pin to Quick access", also
+  over a group or inside its list (it said "Add to <group>" there).
+
 ## 1.4.0 — 2026-11-07
 
 - Folders bar: while you drag a folder in from File Explorer (or the desktop, or another app), stop on a group

@@ -4,7 +4,7 @@
 
 #define AppName "Vertical Tabs for File Explorer"
 #define AppShortName "VTabsExplorer"
-#define AppVersion "1.4.0"
+#define AppVersion "1.4.1"
 #define AppPublisher "LucaSorvillo"
 #define AppRepo "https://github.com/LucaSorvillo/vertical-tabs-explorer"
 #define AppSite "https://lucasorvillo.github.io/vertical-tabs-explorer/"
