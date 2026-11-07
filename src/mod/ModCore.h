@@ -39,7 +39,17 @@ namespace xpx::mod
 
         ModCore() = default;
         // Installa gli agganci di Discovery (sul thread della prima finestra con XAML pronto) e cerca le finestre già aperte.
+        // Ritorna prima se la tray viene chiusa con "Esci" nel frattempo.
         void StartDiscovery();
+        // "Esci" della tray (tray-exited.txt): smonta tutto quello che la mod ha messo in Esplora file (finestre sul loro
+        // thread, agganci, thread delle letture, classi di finestra) e dice se la DLL si può scaricare: nessun ciclo modale
+        // nostro aperto, nessuno dentro i nostri agganci, nessun oggetto nostro ancora vivo (contatore del modulo C++/WinRT,
+        // che conta anche i delegati degli eventi XAML). Dal thread di controllo; si può richiamare (riprende da dove era).
+        bool TryUnload();
+        // Sul thread della finestra: stacca le feature (come alla chiusura, ma rimettendo tutto) e dimentica la finestra.
+        void TeardownWindow(std::shared_ptr<WindowEntry> const& entry);
+        // Tray riavviata prima che la DLL fosse scaricata: agganci e finestre di nuovo.
+        void Resume();
         // Dagli agganci (thread della finestra, dentro il layout o una richiesta UI Automation): rimanda RegisterWindow.
         static void OnTabViewFound(winrt::Microsoft::UI::Xaml::Controls::TabView const& tabView) noexcept;
         // Sul thread della finestra: una barra delle schede nuova diventa una finestra gestita.
@@ -47,7 +57,8 @@ namespace xpx::mod
         // Dal thread di controllo: cerca con UI Automation le finestre visibili non ancora gestite (now: anche quelle appena
         // comparse, alla partenza).
         void ProbeUnmanaged(bool now);
-        void BackgroundLoop();
+        // Resta in ascolto di impostazioni, colori e comandi; ritorna true quando la mod si è tolta e la DLL va scaricata.
+        bool BackgroundLoop();
         void AttachFeatures(std::shared_ptr<WindowEntry> const& entry);
         // Sul thread della finestra: ferma il timer e stacca le feature; poi dimentica la finestra.
         void ReleaseWindow(std::shared_ptr<WindowEntry> const& entry, bool restore);
@@ -73,5 +84,9 @@ namespace xpx::mod
             int attempts = 0;
         };
         std::unordered_map<HWND, ProbeState> m_probes;
+        // Scaricamento (solo dal thread di controllo): finestre staccate e agganci tolti; code dei thread delle finestre viste
+        // (per la barriera: un aggancio entrato prima del ripristino ne è uscito quando il suo thread torna al ciclo).
+        bool m_tornDown = false;
+        std::vector<winrt::Microsoft::UI::Dispatching::DispatcherQueue> m_seenDispatchers;
     };
 }

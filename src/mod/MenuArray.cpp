@@ -21,6 +21,9 @@ namespace xpx::mod
 
         class MenuArray final : public IContextMenu3, public IObjectWithSite, public IServiceProvider, public IDefaultFolderMenuInitialize
         {
+            // Conta fra gli oggetti vivi della DLL, come quelli C++/WinRT: la mod non si scarica finché la shell ne tiene uno.
+            winrt::impl::update_module_lock m_moduleLock;
+
         public:
             explicit MenuArray(std::vector<winrt::com_ptr<IContextMenu>> menus) : m_menus(std::move(menus))
             {

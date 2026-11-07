@@ -2,6 +2,7 @@
 #include "NavBar.h"
 
 #include "../ModShared.h"
+#include "Lifetime.h"
 #include "Interop.h"
 #include "MenuArray.h"
 #include "ModLog.h"
@@ -2011,6 +2012,7 @@ namespace xpx::mod
         {
             const std::wstring question = UiItalian() ? L"Aprire " + std::to_wstring(keys.size()) + L" cartelle in schede nuove?"
                                                       : L"Open " + std::to_wstring(keys.size()) + L" folders in new tabs?";
+            const lifetime::ModalScope modal; // (la DLL non si scarica finché la domanda è aperta)
             if (MessageBoxW(m_main, question.c_str(), Tr(L"File Explorer", L"Esplora file"), MB_OKCANCEL | MB_ICONQUESTION) != IDOK)
             {
                 return;
@@ -2292,7 +2294,11 @@ namespace xpx::mod
             };
             XPX_MLOG(L"NavBar: menu classico di una voce.");
             m_menuOpen = true;
-            const UINT command = TrackPopupMenuEx(popup, TPM_RETURNCMD | TPM_RIGHTBUTTON, screen.x, screen.y, m_main, nullptr);
+            UINT command = 0;
+            {
+                const lifetime::ModalScope modal; // (la DLL non si scarica finché il menu è aperto)
+                command = TrackPopupMenuEx(popup, TPM_RETURNCMD | TPM_RIGHTBUTTON, screen.x, screen.y, m_main, nullptr);
+            }
             m_menuOpen = false;
             m_layout.onMenuMessage = nullptr;
             if (command >= kExtraFirstId)

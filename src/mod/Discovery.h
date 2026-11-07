@@ -35,4 +35,11 @@ namespace xpx::mod::discovery
     // Fa trovare la barra delle schede di una finestra già aperta (ricerca UI Automation sull'isola dell'intestazione).
     // Da un thread MTA che non sia quello della finestra. true se ha trovato una scheda.
     bool Probe(HWND window);
+
+    // Scaricamento della mod ("Esci" della tray): rimette nelle vtable le funzioni originali. false se una voce non è più
+    // la nostra (un altro aggancio sopra il nostro chiamerebbe ancora il nostro codice): allora la DLL non si scarica.
+    // Dopo, Install può ripartire da capo.
+    bool Uninstall();
+    // Chiamate dentro i nostri agganci in questo momento (prima di scaricare la DLL deve essere zero).
+    int InFlight();
 }

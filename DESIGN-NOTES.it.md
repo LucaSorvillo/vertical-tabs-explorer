@@ -1537,7 +1537,39 @@ barra delle cartelle spente, senza scrivere niente in settings.ini (la mod vi sa
 crash della tray o la fine della sessione di Windows non lo scrivono (solo "Esci" e `--exit`, che usano anche gli
 installer: disinstallando, le finestre tornano subito normali; tolto il messaggio "restano fino al riavvio"). Per
 la compilazione e le prove `--exit --keep-mods` esce senza file. Prova: scratchpad `media\xpx-exit-test.ps1` nella
-finestra dimostrativa (spenta in 0,1 s, riaccesa con gli stessi colori, `--keep-mods` accesa). Per rimuovere tutto: spegnere le schede verticali,
+finestra dimostrativa (spenta in 0,1 s, riaccesa con gli stessi colori, `--keep-mods` accesa).
+
+**"Esci" toglie la mod da Esplora file** (dalla 1.5.0). Richiesta dell'utente: "se clicco Exit mi aspetto che tutto quello
+che riguarda i nostri due programmi muoia". La DLL non è più fissata (`PinModule` tolto). Dopo lo spegnimento,
+`ModCore::TryUnload` (dal thread di controllo, riprovabile) toglie tutto e poi chiama `FreeLibraryAndExitThread`:
+- se è aperto un ciclo modale nostro (menu classico, domanda: `lifetime::ModalScope`) si aspetta, perché il nostro codice
+  è sullo stack di quel thread e i lavori del dispatcher arriverebbero dentro il ciclo;
+- ogni finestra si stacca sul suo thread (`TeardownWindow`). I colori, solo in memoria, restano come file "pending": li
+  rimette la mod che rientra, e intanto la tray li legge come i colori della finestra. Poi `Detach(true)` e
+  `TextInput::Reset`;
+- tornano gli agganci originali: `discovery::Uninstall` rimette le voci delle vtable (solo se sono ancora le nostre) e
+  `glass::Uninstall` le importazioni col valore di prima (anche il thunk del caricamento ritardato). Poi si aspettano i
+  contatori delle chiamate in corso, un giro del ciclo di ogni thread delle finestre (barriera) e 300 ms di margine;
+- `NavItems::Stop`: il thread toglie da sé notifiche della shell, finestra, classe, PIDL, cache degli elementi della
+  shell e appartamento;
+- il contatore del modulo C++/WinRT (`winrt::get_module_lock()`, che conta anche i delegati degli eventi XAML) deve
+  arrivare a zero. `MenuArray` (COM scritto a mano) vi partecipa con `update_module_lock`;
+- si tolgono le classi di finestra (`CaptionButtons`, `ModernMenu`; la loro registrazione ora si rifà se manca).
+
+Se un passo non riesce si riprova (al più ogni 5 s) e intanto la mod resta, spenta. Se la tray riparte prima, `Resume`.
+
+Due problemi trovati provando:
+- due iniezioni quasi insieme (la tray e `--inject-pid`) lasciavano due riferimenti alla DLL, che restava nel processo
+  inerte. Ora un mutex per processo (`Local\VTabsExplorer.Inject.<pid>`) protegge "c'è già? se no inietta";
+- gli hook di thread del nostro processo vanno con `hMod = NULL`: con il modulo, user32 ne tiene un altro riferimento.
+
+La tray controlla ogni 5 s che i processi sorvegliati abbiano ancora la mod, e se no la rimette. Un aggiornamento entra
+subito (la vecchia esce, la nuova entra) senza riavviare Esplora file.
+
+Prove nel processo dimostrativo (scratchpad):
+- `media\xpx-unload-test.ps1`, 3 cicli: DLL fuori in 0,5 s e processo vivo; senza la mod funzionano schede, una finestra
+  nuova con Ctrl+N e UI Automation; poi la mod rientra con gli stessi colori;
+- `media\xpx-unload-edge-test.ps1`: con il menu classico aperto aspetta e poi esce; tray chiusa e subito riaperta. Per rimuovere tutto: spegnere le schede verticali,
 chiudere la tray, riavviare Esplora file, togliere "Avvia con Windows", cancellare
 `%LOCALAPPDATA%\VTabsExplorer` e la cartella del progetto. Su disco Esplora file non viene mai modificato.
 

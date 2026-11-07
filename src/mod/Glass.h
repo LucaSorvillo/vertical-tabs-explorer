@@ -18,6 +18,11 @@ namespace xpx::mod::glass
     // scaricata). true se almeno un aggancio è attivo.
     bool Install();
     bool Hooked();
+    // Scaricamento della mod: rimette le importazioni di prima. false se una voce non è più la nostra (la DLL non si
+    // scarica). Le finestre devono aver già tolto il loro limite (WindowLayout::Detach).
+    bool Uninstall();
+    // Chiamate dentro l'aggancio in questo momento.
+    int InFlight();
 
     // Limite del margine superiore della zona vetro (px client) per una finestra, o nessun limite (torna quella di Esplora
     // file). fallbackTopPx è il margine di Esplora file da usare se la sua richiesta non è nota (finestra creata prima

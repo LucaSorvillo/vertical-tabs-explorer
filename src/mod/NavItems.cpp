@@ -61,6 +61,19 @@ namespace xpx::mod
             com_ptr<IShellItem> shellItem;
         };
 
+        // Voci della shell fissate nell'albero (lette al più ogni 10 minuti), solo dal thread delle letture: le svuota lui
+        // quando si ferma (gli oggetti della shell vanno rilasciati dal thread che li ha creati, prima di scaricare la DLL).
+        std::vector<Candidate>& NamespaceCache()
+        {
+            static std::vector<Candidate> items;
+            return items;
+        }
+        ULONGLONG& NamespaceCacheTime()
+        {
+            static ULONGLONG read = 0;
+            return read;
+        }
+
         PROPERTYKEY KeyOf(const wchar_t* name)
         {
             PROPERTYKEY key{};
@@ -211,9 +224,10 @@ namespace xpx::mod
                 return;
             }
             m_started = true;
+            m_stop = false;
             m_wake = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         }
-        std::thread([this] {
+        std::thread worker([this] {
             try
             {
                 Run();
@@ -222,7 +236,55 @@ namespace xpx::mod
             {
                 XPX_MLOG(L"NavItems: errore inatteso, letture fermate (0x%08X).", static_cast<unsigned>(winrt::to_hresult()));
             }
-        }).detach();
+        });
+        // Un handle nostro al thread, per aspettarlo allo scaricamento (std::thread poi si stacca).
+        HANDLE handle = nullptr;
+        DuplicateHandle(GetCurrentProcess(), worker.native_handle(), GetCurrentProcess(), &handle, SYNCHRONIZE, FALSE, 0);
+        worker.detach();
+        std::scoped_lock lock(m_lock);
+        m_thread = handle;
+    }
+
+    bool NavItems::Stop(DWORD timeoutMs)
+    {
+        HANDLE thread = nullptr;
+        {
+            std::scoped_lock lock(m_lock);
+            if (!m_started)
+            {
+                return true;
+            }
+            thread = m_thread;
+        }
+        m_stop = true;
+        if (m_wake)
+        {
+            SetEvent(m_wake);
+        }
+        if (thread && WaitForSingleObject(thread, timeoutMs) != WAIT_OBJECT_0)
+        {
+            XPX_MLOG(L"NavItems: il thread delle letture non si è fermato entro %lu ms.", timeoutMs);
+            return false;
+        }
+        std::scoped_lock lock(m_lock);
+        if (m_thread)
+        {
+            CloseHandle(m_thread);
+            m_thread = nullptr;
+        }
+        if (m_wake)
+        {
+            CloseHandle(m_wake);
+            m_wake = nullptr;
+        }
+        m_started = false;
+        m_latest = nullptr;
+        m_moves.clear();
+        m_pins.clear();
+        m_iconCache.clear();
+        m_publishedSizes.clear();
+        XPX_MLOG(L"NavItems: thread delle letture fermato.");
+        return true;
     }
 
     void NavItems::UseIconSize(int pixels)
@@ -393,23 +455,27 @@ namespace xpx::mod
         windowClass.lpszClassName = L"VTabsExplorer.NavItems";
         RegisterClassW(&windowClass);
         const HWND hwnd = CreateWindowExW(0, windowClass.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, g_module, nullptr);
-        size_t registrations = 0;
+        std::vector<ULONG> registrations;
+        std::vector<PIDLIST_ABSOLUTE> pidls;
         for (const wchar_t* folder : { kQuickAccess, kFrequentPlaces })
         {
             PIDLIST_ABSOLUTE pidl = nullptr;
             if (hwnd && SUCCEEDED(SHParseDisplayName(folder, nullptr, &pidl, 0, nullptr)) && pidl)
             {
                 SHChangeNotifyEntry entry{ pidl, FALSE };
-                registrations += SHChangeNotifyRegister(hwnd, SHCNRF_ShellLevel | SHCNRF_InterruptLevel | SHCNRF_NewDelivery, SHCNE_ALLEVENTS,
-                                                        kNotifyMessage, 1, &entry) != 0;
-                // Il PIDL resta in uso per tutta la vita del thread (la registrazione non si toglie mai).
+                if (const ULONG id = SHChangeNotifyRegister(hwnd, SHCNRF_ShellLevel | SHCNRF_InterruptLevel | SHCNRF_NewDelivery, SHCNE_ALLEVENTS,
+                                                            kNotifyMessage, 1, &entry))
+                {
+                    registrations.push_back(id);
+                }
+                pidls.push_back(pidl); // in uso finché la registrazione resta (fino all'arresto del thread)
             }
         }
-        XPX_MLOG(L"NavItems: in ascolto dei cambiamenti di Accesso rapido (%zu registrazioni).", registrations);
+        XPX_MLOG(L"NavItems: in ascolto dei cambiamenti di Accesso rapido (%zu registrazioni).", registrations.size());
 
         Load();
         ULONGLONG lastLoad = GetTickCount64();
-        for (;;)
+        while (!m_stop.load())
         {
             // A riposo il thread dorme fino alla prossima rilettura periodica; con una notifica in sospeso, fino
             // allo scadere della sua attesa (le notifiche arrivano a raffiche).
@@ -426,6 +492,10 @@ namespace xpx::mod
             {
                 TranslateMessage(&message);
                 DispatchMessageW(&message);
+            }
+            if (m_stop.load())
+            {
+                break;
             }
             now = GetTickCount64();
             dirty = hwnd ? reinterpret_cast<uintptr_t>(GetPropW(hwnd, L"VTabsExplorer.NavItems.Dirty")) : 0;
@@ -459,6 +529,26 @@ namespace xpx::mod
                 lastLoad = GetTickCount64();
             }
         }
+
+        // Arresto (scaricamento della mod): tutto quello che il thread ha messo in Esplora file va via da qui, sul suo thread.
+        for (const ULONG id : registrations)
+        {
+            SHChangeNotifyDeregister(id);
+        }
+        for (PIDLIST_ABSOLUTE pidl : pidls)
+        {
+            CoTaskMemFree(pidl);
+        }
+        if (hwnd)
+        {
+            RemovePropW(hwnd, L"VTabsExplorer.NavItems.Dirty");
+            DestroyWindow(hwnd);
+        }
+        UnregisterClassW(windowClass.lpszClassName, g_module);
+        NamespaceCache().clear();
+        NamespaceCacheTime() = 0;
+        m_forcePublish = false;
+        winrt::uninit_apartment();
     }
 
     void NavItems::Load()
@@ -475,8 +565,8 @@ namespace xpx::mod
         // 1) Elementi del Desktop fissati nell'albero (solo quelli della shell, ::{GUID}). Elencare il Desktop
         //    costa (passa anche da tutte le cartelle sul desktop dell'utente) e queste voci cambiano di rado:
         //    si rileggono al massimo ogni 10 minuti. Solo da questo thread.
-        static std::vector<Candidate> namespaceItems;
-        static ULONGLONG namespaceRead = 0;
+        std::vector<Candidate>& namespaceItems = NamespaceCache();
+        ULONGLONG& namespaceRead = NamespaceCacheTime();
         if (namespaceRead == 0 || GetTickCount64() - namespaceRead >= kNamespaceMaxAgeMs)
         {
             namespaceItems.clear();

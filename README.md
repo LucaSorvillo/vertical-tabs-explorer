@@ -181,7 +181,8 @@ Everything is in the tray menu (right-click the icon):
 | Exit | |
 
 Turning off the vertical tabs or the folders bar brings back File Explorer's normal tab strip and navigation
-pane right away. **Exit** does the same in every open window, and both come back when you start the app again.
+pane right away. **Exit** removes the app from File Explorer completely: every open window goes back to normal at
+once, and nothing of the app stays loaded. Everything comes back, tab colors included, when you start the app again.
 
 The app also accepts a few command-line options: `--restore-now`, `--reopen-tab`, `--exit`.
 
@@ -194,9 +195,10 @@ taskbar and the desktop. So:
 - The tray app watches every File Explorer process that has the module. If one ends with a crash code, the
   vertical tabs and the folders bar are **suspended at once**: a notification says so, and the module isn't
   loaded again until you turn the feature back on from the tray menu.
-- The module can't be unloaded. Turning the feature off restores File Explorer's normal interface, but the
-  module stays loaded until File Explorer restarts. After an update, the new module takes effect when File
-  Explorer restarts (or when you sign out and in again).
+- **Exit** unloads the module: it first puts back everything it changed in File Explorer (windows, hooks, its
+  threads), and leaves only when nothing of it is still in use. If something is (a menu of the bar still open,
+  for example), it waits and tries again. Turning a feature off only restores File Explorer's normal interface.
+  An update takes effect at once too: the setup closes the app, the old module leaves, the new one comes in.
 
 Session restore, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>, folders in tabs and the back-to-top button don't
 load anything into File Explorer.

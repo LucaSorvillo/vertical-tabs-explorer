@@ -23,6 +23,15 @@ namespace xpx::mod::glass
         std::unordered_map<HWND, WindowGlass> g_windows;
         std::unordered_set<HMODULE> g_hookedModules;
         std::atomic<bool> g_hooked{ false };
+        // Voci delle importazioni sostituite, col valore di prima (anche il thunk del caricamento ritardato), per rimetterle
+        // allo scaricamento; chiamate in corso nell'aggancio.
+        struct HookedSlot
+        {
+            void** slot = nullptr;
+            void* original = nullptr;
+        };
+        std::vector<HookedSlot> g_slots;
+        std::atomic<int> g_inFlight{ 0 };
 
         // La funzione vera (attraverso le importazioni di questa DLL): mai il thunk del caricamento ritardato del modulo
         // agganciato, che risolverebbe la funzione riscrivendo la voce e togliendo l'aggancio.
@@ -54,6 +63,14 @@ namespace xpx::mod::glass
 
         HRESULT WINAPI ExtendFrameHook(HWND hwnd, const MARGINS* margins)
         {
+            ++g_inFlight;
+            struct Leave
+            {
+                ~Leave()
+                {
+                    --g_inFlight;
+                }
+            } const leave;
             if (!margins)
             {
                 return CallOriginal(hwnd, margins);
@@ -176,18 +193,64 @@ namespace xpx::mod::glass
                 XPX_MLOG(L"Zona vetro: importazioni di %s non modificabili (%lu).", name, GetLastError());
                 return false;
             }
-            InterlockedExchangePointer(slot, reinterpret_cast<void*>(&ExtendFrameHook));
+            void* const original = InterlockedExchangePointer(slot, reinterpret_cast<void*>(&ExtendFrameHook));
             VirtualProtect(slot, sizeof(void*), protect, &protect);
+            g_slots.push_back(HookedSlot{ slot, original });
             g_hookedModules.insert(module);
             XPX_MLOG(L"Zona vetro: aggancio di DwmExtendFrameIntoClientArea installato in %s.", name);
             return true;
         }
     }
 
-    bool Install()
+    std::mutex& InstallLock()
     {
         static std::mutex installLock;
-        std::scoped_lock lock(installLock);
+        return installLock;
+    }
+
+    bool Uninstall()
+    {
+        std::scoped_lock lock(InstallLock());
+        bool ok = true;
+        std::vector<HookedSlot> kept;
+        for (HookedSlot const& hooked : g_slots)
+        {
+            DWORD protect = 0;
+            if (!VirtualProtect(hooked.slot, sizeof(void*), PAGE_READWRITE, &protect))
+            {
+                ok = false;
+                kept.push_back(hooked);
+                continue;
+            }
+            const bool ours = InterlockedCompareExchangePointer(hooked.slot, hooked.original, reinterpret_cast<void*>(&ExtendFrameHook)) ==
+                              reinterpret_cast<void*>(&ExtendFrameHook);
+            VirtualProtect(hooked.slot, sizeof(void*), protect, &protect);
+            if (!ours)
+            {
+                ok = false; // un altro aggancio sopra il nostro: la DLL non si scarica
+                kept.push_back(hooked);
+            }
+        }
+        g_slots = std::move(kept);
+        if (ok)
+        {
+            g_hookedModules.clear();
+            g_hooked = false;
+            std::scoped_lock windows(g_lock);
+            g_windows.clear();
+        }
+        XPX_MLOG(L"Zona vetro: importazioni originali rimesse (%s).", ok ? L"tutte" : L"NON tutte: la mod non si scarica");
+        return ok;
+    }
+
+    int InFlight()
+    {
+        return g_inFlight.load();
+    }
+
+    bool Install()
+    {
+        std::scoped_lock lock(InstallLock());
         for (const wchar_t* name : { L"ExplorerFrame.dll", L"ieframe.dll" })
         {
             if (HookModule(name))

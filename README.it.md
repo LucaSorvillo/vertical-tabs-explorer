@@ -185,8 +185,9 @@ Tutto è nel menu della tray (clic destro sull'icona):
 Con Windows in un'altra lingua le voci sono in inglese, come nell'immagine.
 
 Spegnendo le schede verticali o la barra delle cartelle tornano subito la normale barra delle schede e il
-riquadro di spostamento di Esplora file. **Esci** fa lo stesso in tutte le finestre aperte, e le due funzioni
-tornano quando riapri l'app.
+riquadro di spostamento di Esplora file. **Esci** toglie l'app da Esplora file del tutto: ogni finestra aperta
+torna subito normale, e dell'app non resta caricato niente. Tutto torna, colori delle schede compresi, quando
+riapri l'app.
 
 L'app accetta anche alcune opzioni da riga di comando: `--restore-now`, `--reopen-tab`, `--exit`.
 
@@ -199,9 +200,11 @@ anche la barra delle applicazioni e il desktop. Per questo:
 - L'app nella tray sorveglia ogni processo di Esplora file con il modulo. Se uno termina con un codice di
   errore, le schede verticali e la barra delle cartelle vengono **sospese subito**: un avviso lo dice, e il
   modulo non viene più caricato finché non si riattiva la funzione dal menu della tray.
-- Il modulo non si può scaricare. Spegnendo la funzione torna l'interfaccia normale di Esplora file, ma il
-  modulo resta caricato finché Esplora file non si riavvia. Dopo un aggiornamento, il nuovo modulo entra in
-  funzione al riavvio di Esplora file (o disconnettendosi e riconnettendosi).
+- **Esci** scarica il modulo: prima rimette tutto quello che ha cambiato in Esplora file (finestre, agganci, i
+  suoi thread), ed esce solo quando niente di suo è ancora in uso. Se qualcosa lo è (per esempio un menu della
+  barra ancora aperto), aspetta e riprova. Spegnere una funzione rimette solo l'interfaccia normale di Esplora
+  file. Anche un aggiornamento entra subito in funzione: l'installazione chiude l'app, il modulo vecchio esce,
+  quello nuovo entra.
 
 Ripristino della sessione, <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>T</kbd>, cartelle in una scheda e "Torna su"
 non caricano nulla dentro Esplora file.

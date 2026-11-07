@@ -159,6 +159,16 @@ namespace xpx::mod
         }
     }
 
+    bool ModernMenu::UnregisterWindowClass()
+    {
+        WNDCLASSEXW info{ sizeof(info) };
+        if (!GetClassInfoExW(ThisModule(), kMessageClass, &info))
+        {
+            return true;
+        }
+        return UnregisterClassW(kMessageClass, ThisModule()) != FALSE; // (fallisce se c'è ancora una finestra della classe)
+    }
+
     ModernMenu::ModernMenu(HWND owner, Callbacks callbacks) : m_owner(owner), m_callbacks(std::move(callbacks))
     {
     }
@@ -201,7 +211,13 @@ namespace xpx::mod
         }
         m_failed = true; // finché non riesce tutto
 
-        static const bool registered = [] {
+        // Ogni volta (la classe si toglie allo scaricamento della mod, e una ripartenza la rimette).
+        const bool registered = [] {
+            WNDCLASSEXW info{ sizeof(info) };
+            if (GetClassInfoExW(ThisModule(), kMessageClass, &info))
+            {
+                return true;
+            }
             WNDCLASSEXW wc{ sizeof(wc) };
             wc.lpfnWndProc = MessageProc;
             wc.hInstance = ThisModule();

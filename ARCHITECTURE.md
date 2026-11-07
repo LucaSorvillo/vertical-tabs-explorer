@@ -109,13 +109,30 @@ replaces two slots in vtables shared by all instances of a class (public WinRT i
 ### Robustness
 
 - Every event handler toward the XAML runtime is wrapped: no exception leaves the module's code.
-- The module is never unloaded, because its hooks stay installed. Turning a feature off restores File
-  Explorer's interface.
+- Turning a feature off restores File Explorer's interface; the module stays loaded.
 - **Exit** (tray menu or `--exit`, which the installer uses too) leaves `tray-exited.txt` in the data folder
-  after the tray app's last session save. The module watches the folder and treats the vertical tabs and the
-  folders bar as off while the file is there, also for windows opened later, without touching `settings.ini`.
-  The tray app deletes the file when it starts, and the module turns everything back on. A crash or the end of
-  the Windows session doesn't create it. `--exit --keep-mods` (build and test scripts) exits without it.
+  after the tray app's last session save. A crash or the end of the Windows session doesn't create it, and
+  `--exit --keep-mods` (build and test scripts) exits without it. The module watches the folder. When the file
+  appears, it turns everything off (`ModSettings::Load`, without touching `settings.ini`) and then removes
+  itself (`ModCore::TryUnload`, `Lifetime.h`):
+  1. If a modal loop of ours is open (the classic menu, a question), it waits: our code is on that thread's stack.
+  2. Every window is detached on its own UI thread, as if closed but restoring everything. Tab colors, which
+     only live in memory, are handed over as a "pending" colors file.
+  3. The vtable hooks (`discovery::Uninstall`) and the import hook (`glass::Uninstall`) get their original
+     entries back. If an entry isn't ours anymore (another hook on top), the module stays.
+  4. It waits until no call is inside our hooks (counters), then for one turn of every window thread's message
+     loop.
+  5. The `NavItems` thread stops, dropping its shell notifications, window, class and shell objects.
+  6. The C++/WinRT module lock must reach zero. It counts every live object of ours, XAML event delegates
+     included, and `MenuArray`, the hand-written COM class, takes part too.
+  7. The window classes are unregistered.
+  8. Finally `FreeLibraryAndExitThread`.
+
+  Any step that can't complete makes it try again on the next turn (at most 5 s). Meanwhile the module stays,
+  switched off. The tray app deletes the file when it starts and injects the module again: one injector at a
+  time per process (`Local\VTabsExplorer.Inject.<pid>` around "loaded? then inject"), so the DLL never has two
+  references. Thread hooks of our own process pass `hMod = NULL` (with the module, user32 would hold one more).
+  Every 5 s it checks that tracked processes still have the module.
 - Test mode (`dev-filter.txt`, `dev-windows.txt` in the data folder) restricts the tray app and the module to
   the windows opened by the tests. `mod-command.txt` accepts test commands addressed to one window.
 

@@ -76,6 +76,10 @@ namespace xpx::mod
         // Aggiunge cartelle ad Accesso rapido (come "Aggiungi ad Accesso rapido", nel posto indicato). Come MovePinned: lo
         // fa il thread delle letture (prima degli spostamenti in attesa), poi rilegge e pubblica una versione nuova.
         void PinFolders(NavPin pin);
+        // Scaricamento della mod: ferma il thread delle letture (che toglie da sé notifiche della shell, finestra, classe e
+        // oggetti della shell) e lo aspetta. false se non si ferma entro timeoutMs (la DLL allora non si scarica). Start può
+        // ripartire.
+        bool Stop(DWORD timeoutMs);
 
     private:
         NavItems() = default;
@@ -91,6 +95,8 @@ namespace xpx::mod
         std::vector<NavPin> m_pins;   // in attesa del thread delle letture
         HANDLE m_wake = nullptr;
         bool m_started = false;
+        HANDLE m_thread = nullptr;          // il thread delle letture (per aspettarlo allo scaricamento)
+        std::atomic<bool> m_stop{ false };  // chiesto l'arresto
         bool m_forcePublish = false; // solo dal thread delle letture
         // Solo dal thread delle letture: icone già prodotte (per nome di analisi e dimensione) e dimensioni
         // dell'ultima lettura pubblicata.

@@ -9,6 +9,7 @@ namespace xpx::mod
     {
         constexpr DWORD kCppException = 0xE06D7363;
         std::atomic<int> g_logged{ 0 };
+        PVOID g_handler = nullptr; // il gestore installato (tolto allo scaricamento della mod)
         thread_local bool t_inside = false;
 
         // Nome (decorato) del tipo di un'eccezione C++ dal suo record; vuoto se non si legge. Senza oggetti C++
@@ -97,7 +98,16 @@ namespace xpx::mod
         {
             return;
         }
-        AddVectoredExceptionHandler(1, Handler);
+        g_handler = AddVectoredExceptionHandler(1, Handler);
         XPX_MLOG(L"DIAGNOSI: eccezioni C++ e gravi registrate con lo stack (dev-exceptions.txt).");
+    }
+
+    void RemoveDevExceptionLog()
+    {
+        if (g_handler)
+        {
+            RemoveVectoredExceptionHandler(g_handler);
+            g_handler = nullptr;
+        }
     }
 }

@@ -59,7 +59,8 @@ namespace xpx::mod
             return;
         }
         t_main = main;
-        t_hook = SetWindowsHookExW(WH_GETMESSAGE, MessageHook, g_module, GetCurrentThreadId());
+        // hMod NULL: thread di questo processo (con il modulo, user32 ne terrebbe un riferimento in più: vedi Discovery.cpp).
+        t_hook = SetWindowsHookExW(WH_GETMESSAGE, MessageHook, nullptr, GetCurrentThreadId());
         if (!t_hook)
         {
             XPX_MLOG(L"TextInput: hook dei tasti non installato (%lu): Backspace e simili restano a Esplora file.", GetLastError());
@@ -81,6 +82,17 @@ namespace xpx::mod
             UnhookWindowsHookEx(t_hook);
             t_hook = nullptr;
         }
+        t_main = nullptr;
+    }
+
+    void TextInput::Reset()
+    {
+        if (t_hook)
+        {
+            UnhookWindowsHookEx(t_hook);
+            t_hook = nullptr;
+        }
+        t_users = 0;
         t_main = nullptr;
     }
 }

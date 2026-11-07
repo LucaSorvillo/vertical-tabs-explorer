@@ -209,9 +209,20 @@ namespace xpx::mod
         Paint(); // (solo se è cambiato qualcosa: ingrandita, dimensioni, scala)
     }
 
+    bool CaptionButtons::UnregisterWindowClass()
+    {
+        WNDCLASSEXW info{ sizeof(info) };
+        if (!GetClassInfoExW(ThisModule(), kClassName, &info))
+        {
+            return true;
+        }
+        return UnregisterClassW(kClassName, ThisModule()) != FALSE; // (fallisce se c'è ancora una finestra della classe)
+    }
+
     bool CaptionButtons::Create(RECT const& rect)
     {
-        static const bool registered = [] {
+        // Ogni volta (la classe si toglie allo scaricamento della mod, e una ripartenza la rimette).
+        const bool registered = [] {
             WNDCLASSEXW info{ sizeof(info) };
             if (GetClassInfoExW(ThisModule(), kClassName, &info))
             {

@@ -3071,6 +3071,33 @@ namespace xpx::mod
         }
     }
 
+    void VerticalTabs::HandOverColors()
+    {
+        if (m_colors.empty() || !m_main)
+        {
+            return;
+        }
+        const auto native = m_nativeList.get();
+        if (!native)
+        {
+            return;
+        }
+        const auto items = native.Items();
+        TabColorList list;
+        list.count = items.Size();
+        for (uint32_t i = 0; i < list.count; ++i)
+        {
+            if (const int color = ColorOf(items.GetAt(i)))
+            {
+                list.colored.push_back(TabColorEntry{ i, color, {} });
+            }
+        }
+        if (!list.colored.empty() && WriteTabColors(ColorFilePath(L"pending"), list))
+        {
+            XPX_MLOG(L"VerticalTabs: %zu colori lasciati da rimettere (la mod esce dal processo).", list.colored.size());
+        }
+    }
+
     void VerticalTabs::OfferPendingColors(HWND window, TabColorList const& list)
     {
         if (window != m_main)

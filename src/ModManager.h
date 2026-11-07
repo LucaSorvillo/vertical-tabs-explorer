@@ -71,6 +71,9 @@ namespace xpx
         // Solo sul thread di controllo
         std::vector<Tracked> m_tracked;
         std::vector<Attempt> m_attempts;
+        // Ultimo controllo che la mod sia ancora nei processi sorvegliati: con "Esci" la mod si toglie da sola, e se la tray
+        // riparte mentre si sta togliendo la trova ancora lì; quando poi sparisce, la si rimette.
+        ULONGLONG m_lastVerify = 0;
         std::unordered_map<HWND, ULONGLONG> m_firstSeen; // quando è comparsa ogni finestra di Esplora file
     };
 }

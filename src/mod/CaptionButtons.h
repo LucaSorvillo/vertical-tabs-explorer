@@ -30,6 +30,9 @@ namespace xpx::mod
         CaptionButtons(CaptionButtons const&) = delete;
         CaptionButtons& operator=(CaptionButtons const&) = delete;
 
+        // Scaricamento della mod: toglie la classe di finestra (false se ne esiste ancora una finestra).
+        static bool UnregisterWindowClass();
+
         // Pulsanti a destra della riga 'row' (coordinate client di 'main': la riga del contenuto, es. da sotto il bordo
         // superiore al fondo della barra), dal suo bordo destro: dalla cima della finestra al fondo della riga (da ingrandita
         // dalla cima dello schermo), con i glifi centrati sulla riga. Rettangolo vuoto: via i nostri, tornano quelli di DWM.

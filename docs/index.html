@@ -84,8 +84,8 @@
       </a>
       <a class="button" href="https://github.com/LucaSorvillo/vertical-tabs-explorer"><span lang="en">Source code on GitHub</span><span lang="it">Codice sorgente su GitHub</span></a>
     </div>
-    <p class="muted" lang="en">Free and open source, MIT license. Windows 11 22H2 or later, 64-bit. Version 1.4.2.</p>
-    <p class="muted" lang="it">Gratis e open source, licenza MIT. Windows 11 22H2 o successivo, a 64 bit. Versione 1.4.2.</p>
+    <p class="muted" lang="en">Free and open source, MIT license. Windows 11 22H2 or later, 64-bit. Version 1.5.0.</p>
+    <p class="muted" lang="it">Gratis e open source, licenza MIT. Windows 11 22H2 o successivo, a 64 bit. Versione 1.5.0.</p>
     <figure>
       <img class="shot" src="assets/explorer-hero.png" width="1484" height="892" alt="File Explorer with its tabs in a column on the left and a bar of folders and groups at the top, showing a folder of photos">
     </figure>
@@ -213,12 +213,12 @@
   <section id="install">
     <h2><span lang="en">Install</span><span lang="it">Installazione</span></h2>
     <ol class="steps" lang="en">
-      <li>Download <code>VTabsExplorer-1.4.2-setup.exe</code> from the <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">latest release</a>.</li>
+      <li>Download <code>VTabsExplorer-1.5.0-setup.exe</code> from the <a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">latest release</a>.</li>
       <li>Run it. No administrator rights needed: it installs for your user only, in English or Italian. It asks whether to start with Windows and whether to turn on the vertical tabs and the folders bar.</li>
       <li>That's it: the app runs in the notification area, and the open File Explorer windows get the new tabs right away.</li>
     </ol>
     <ol class="steps" lang="it">
-      <li>Scarica <code>VTabsExplorer-1.4.2-setup.exe</code> dall'<a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">ultima release</a>.</li>
+      <li>Scarica <code>VTabsExplorer-1.5.0-setup.exe</code> dall'<a href="https://github.com/LucaSorvillo/vertical-tabs-explorer/releases/latest">ultima release</a>.</li>
       <li>Avvialo. Non servono diritti di amministratore: si installa solo per il tuo utente, in italiano o in inglese. Chiede se avviarsi con Windows e se attivare le schede verticali e la barra delle cartelle.</li>
       <li>Fatto: l'app resta nell'area di notifica, e le finestre di Esplora file aperte prendono subito le nuove schede.</li>
     </ol>
@@ -302,7 +302,7 @@
     <h2><span lang="en">Questions</span><span lang="it">Domande</span></h2>
     <div class="faq" lang="en">
       <details><summary>Do I need the vertical tabs for the other features?</summary><div><p>No. Session restore, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>, folders in tabs and the back-to-top button work on their own, from outside File Explorer.</p></div></details>
-      <details><summary>Does it change File Explorer?</summary><div><p>No. Nothing changes on disk. While the app runs, the vertical tabs and the folders bar come from a module loaded into File Explorer. Turn them off, or exit the app, and File Explorer's own tab strip and navigation pane come back right away. Uninstall the app, and nothing is loaded after File Explorer restarts.</p></div></details>
+      <details><summary>Does it change File Explorer?</summary><div><p>No. Nothing changes on disk. While the app runs, the vertical tabs and the folders bar come from a module loaded into File Explorer. Turn them off and File Explorer's own tab strip and navigation pane come back right away. Exit the app, or uninstall it, and the module leaves File Explorer completely.</p></div></details>
       <details><summary>What happens if File Explorer crashes?</summary><div><p>Windows restarts it as usual. If the module was loaded, the app suspends the vertical tabs and the folders bar and tells you. Your folders come back the next time you open File Explorer.</p></div></details>
       <details><summary>Why doesn't the bar show all my Quick Access folders?</summary><div><p>Windows lists at most 50 folders pinned to Quick Access, in the navigation pane and in Home too, and the bar shows the same ones. If you pin more, the last ones don't appear anywhere.</p></div></details>
       <details><summary>Why do Windows or my antivirus warn me?</summary><div><p>The installer isn't signed yet, and loading a module into <code>explorer.exe</code> is something security tools watch closely. The code is open: you can read it and build it yourself.</p></div></details>
@@ -312,7 +312,7 @@
     </div>
     <div class="faq" lang="it">
       <details><summary>Servono le schede verticali per le altre funzioni?</summary><div><p>No. Ripristino della sessione, <kbd>Ctrl</kbd>+<kbd>Maiusc</kbd>+<kbd>T</kbd>, cartelle in una scheda e "Torna su" funzionano da sole, dall'esterno di Esplora file.</p></div></details>
-      <details><summary>Modifica Esplora file?</summary><div><p>No. Su disco non cambia niente. Mentre l'app è aperta, schede verticali e barra delle cartelle vengono da un modulo caricato dentro Esplora file. Spegnile, o chiudi l'app, e tornano subito la barra delle schede e il riquadro di spostamento di Esplora file. Disinstalla l'app, e dopo il riavvio di Esplora file non viene caricato più niente.</p></div></details>
+      <details><summary>Modifica Esplora file?</summary><div><p>No. Su disco non cambia niente. Mentre l'app è aperta, schede verticali e barra delle cartelle vengono da un modulo caricato dentro Esplora file. Spegnile e tornano subito la barra delle schede e il riquadro di spostamento di Esplora file. Chiudi l'app, o disinstallala, e il modulo esce del tutto da Esplora file.</p></div></details>
       <details><summary>Cosa succede se Esplora file si chiude per un errore?</summary><div><p>Windows lo riavvia come sempre. Se il modulo era caricato, l'app sospende le schede verticali e la barra delle cartelle e te lo dice. Le cartelle tornano la prossima volta che apri Esplora file.</p></div></details>
       <details><summary>Perché la barra non mostra tutte le mie cartelle di Accesso rapido?</summary><div><p>Windows elenca al massimo 50 cartelle aggiunte ad Accesso rapido, anche nel riquadro di spostamento e nella Home, e la barra mostra le stesse. Se ne aggiungi di più, le ultime non compaiono da nessuna parte.</p></div></details>
       <details><summary>Perché Windows o l'antivirus mi avvisano?</summary><div><p>L'installer non ha ancora una firma digitale, e caricare un modulo dentro <code>explorer.exe</code> è una cosa che i programmi di sicurezza tengono d'occhio. Il codice è aperto: puoi leggerlo e compilarlo da te.</p></div></details>

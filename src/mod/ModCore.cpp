@@ -1,11 +1,16 @@
 ﻿#include "pch.h"
 #include "ModCore.h"
 
+#include "CaptionButtons.h"
 #include "DevDiagnostics.h"
 #include "Discovery.h"
 #include "Glass.h"
 #include "Interop.h"
+#include "Lifetime.h"
 #include "ModLog.h"
+#include "ModernMenu.h"
+#include "NavItems.h"
+#include "TextInput.h"
 #include "TreeDump.h"
 #include "VerticalTabs.h"
 #include "../ModShared.h"
@@ -14,11 +19,90 @@ extern HMODULE g_module;
 
 namespace xpx::mod
 {
+    namespace lifetime
+    {
+        namespace
+        {
+            std::atomic<bool> g_unloading{ false };
+        }
+
+        std::atomic<int>& ModalDepth()
+        {
+            static std::atomic<int> depth{ 0 };
+            return depth;
+        }
+
+        bool Unloading()
+        {
+            return g_unloading.load();
+        }
+    }
+
     namespace
     {
         namespace mux = winrt::Microsoft::UI::Xaml;
         namespace muxc = winrt::Microsoft::UI::Xaml::Controls;
         using winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority;
+
+        // Il segnaposto della copia attiva della mod in questo processo (chiuso allo scaricamento).
+        HANDLE g_activeMutex = nullptr;
+
+        bool WaitUntil(std::function<bool()> const& condition, ULONGLONG timeoutMs)
+        {
+            const ULONGLONG deadline = GetTickCount64() + timeoutMs;
+            while (!condition())
+            {
+                if (GetTickCount64() > deadline)
+                {
+                    return false;
+                }
+                Sleep(25);
+            }
+            return true;
+        }
+
+        // Esegue work sul thread di ogni finestra e aspetta che tutte abbiano finito (false allo scadere). Lo stato condiviso
+        // sta in un shared_ptr: un lavoro arrivato dopo lo scadere non tocca memoria già liberata.
+        template <typename Entry, typename Work>
+        bool RunOnEachThread(std::vector<Entry> const& entries, ULONGLONG timeoutMs, Work work)
+        {
+            struct Pending
+            {
+                std::atomic<size_t> remaining{ 0 };
+                HANDLE done = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+                ~Pending()
+                {
+                    CloseHandle(done);
+                }
+            };
+            if (entries.empty())
+            {
+                return true;
+            }
+            const auto pending = std::make_shared<Pending>();
+            pending->remaining = entries.size();
+            for (auto const& entry : entries)
+            {
+                bool queued = false;
+                try
+                {
+                    queued = work(entry, [pending] {
+                        if (--pending->remaining == 0)
+                        {
+                            SetEvent(pending->done);
+                        }
+                    });
+                }
+                catch (...)
+                {
+                }
+                if (!queued && --pending->remaining == 0)
+                {
+                    SetEvent(pending->done);
+                }
+            }
+            return WaitForSingleObject(pending->done, static_cast<DWORD>(timeoutMs)) == WAIT_OBJECT_0;
+        }
 
         // Il TabView dell'intestazione di Esplora file sta dentro questo controllo.
         constexpr std::wstring_view kTabControlType = L"FileExplorerExtensions.FileExplorerTabControl";
@@ -69,25 +153,39 @@ namespace xpx::mod
             return false;
         }
 
-        // Impedisce che la DLL venga scaricata: il runtime XAML conserva puntatori al nostro codice.
-        void PinModule()
-        {
-            HMODULE pinned = nullptr;
-            GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN, reinterpret_cast<LPCWSTR>(&PinModule), &pinned);
-        }
+        // La DLL non è più fissata: con "Esci" della tray la mod si toglie e la scarica (ModCore::TryUnload, che controlla prima
+        // che il runtime XAML non tenga più niente di nostro). Finché è caricata, il riferimento è quello dell'iniezione.
 
         bool WaitForModule(const wchar_t* name, ULONGLONG timeoutMs)
         {
             const ULONGLONG deadline = GetTickCount64() + timeoutMs;
             while (!GetModuleHandleW(name))
             {
-                if (GetTickCount64() > deadline)
+                if (GetTickCount64() > deadline || ModSettings::Load().trayExited)
                 {
                     return false;
                 }
                 Sleep(100);
             }
             return true;
+        }
+
+        // La DLL esce dal processo: ultimo atto del thread di controllo (TryUnload ha già tolto tutto).
+        [[noreturn]] void UnloadNow(bool apartment)
+        {
+            RemoveDevExceptionLog();
+            if (g_activeMutex)
+            {
+                CloseHandle(g_activeMutex);
+                g_activeMutex = nullptr;
+            }
+            XPX_MLOG(L"Mod tolta da Esplora file (processo %lu): DLL scaricata.", GetCurrentProcessId());
+            if (apartment)
+            {
+                winrt::clear_factory_cache();
+                winrt::uninit_apartment();
+            }
+            FreeLibraryAndExitThread(g_module, 0);
         }
 
         std::wstring ImageName()
@@ -183,12 +281,11 @@ namespace xpx::mod
     DWORD WINAPI ModCore::BootstrapThreadProc(void*)
     {
         LogInit();
-        PinModule();
 
         if (_wcsicmp(ImageName().c_str(), L"explorer.exe") != 0)
         {
-            XPX_MLOG(L"Processo non supportato (%s): la mod resta inattiva.", ImageName().c_str());
-            return 0;
+            XPX_MLOG(L"Processo non supportato (%s): la mod si scarica.", ImageName().c_str());
+            FreeLibraryAndExitThread(g_module, 0);
         }
         // Nel processo della barra delle applicazioni la porta solo la tray, con le schede verticali attive
         // e la sorveglianza dei crash (ModManager): qui si annota soltanto dove ci si trova.
@@ -199,11 +296,12 @@ namespace xpx::mod
         const HANDLE active = CreateMutexW(nullptr, FALSE, mutexName.c_str());
         if (active && GetLastError() == ERROR_ALREADY_EXISTS)
         {
-            XPX_MLOG(L"Un'altra copia della mod è già attiva nel processo %lu: questa resta inattiva.", GetCurrentProcessId());
+            XPX_MLOG(L"Un'altra copia della mod è già attiva nel processo %lu: questa si scarica.", GetCurrentProcessId());
             CloseHandle(active);
-            return 0;
+            FreeLibraryAndExitThread(g_module, 0);
         }
-        // L'handle resta aperto per tutta la vita del processo (è il "segnaposto" della copia attiva).
+        // L'handle resta aperto finché la mod è nel processo (è il "segnaposto" della copia attiva).
+        g_activeMutex = active;
 
         SetVerbose(ModSettings::Load().verboseLog); // log dettagliato solo se chiesto ([Debug] VerboseLog)
         InstallDevExceptionLog(shellProcess);       // solo nelle prove (dev-exceptions.txt)
@@ -227,6 +325,11 @@ namespace xpx::mod
             XPX_MLOG(L"Runtime WinUI 3 non ancora presente nel processo: resto in attesa.");
             while (!GetModuleHandleW(L"Microsoft.Internal.FrameworkUdk.dll"))
             {
+                // Tray chiusa con "Esci" prima di qualunque finestra: c'è solo l'aggancio della zona vetro da togliere.
+                if (ModSettings::Load().trayExited && Instance().TryUnload())
+                {
+                    UnloadNow(true);
+                }
                 Sleep(1000);
             }
         }
@@ -236,7 +339,10 @@ namespace xpx::mod
             return 0;
         }
         Instance().StartDiscovery();
-        Instance().BackgroundLoop();
+        if (Instance().BackgroundLoop())
+        {
+            UnloadNow(true);
+        }
         return 0;
     }
 
@@ -249,6 +355,10 @@ namespace xpx::mod
         int failures = 0;
         while (!discovery::Installed())
         {
+            if (lifetime::Unloading() || ModSettings::Load().trayExited)
+            {
+                return; // tray chiusa con "Esci": ci pensa BackgroundLoop (TryUnload)
+            }
             bool tried = false;
             for (HWND window : OurWindows(/*visibleOnly*/ false))
             {
@@ -288,6 +398,10 @@ namespace xpx::mod
     {
         // Siamo dentro il layout XAML (OnApplyTemplate) o dentro una richiesta UI Automation: qui solo un riferimento
         // debole, il resto al prossimo giro del thread della finestra (con l'intestazione ormai costruita).
+        if (lifetime::Unloading())
+        {
+            return;
+        }
         try
         {
             const auto dispatcher = tabView.DispatcherQueue();
@@ -316,6 +430,10 @@ namespace xpx::mod
 
     void ModCore::RegisterWindow(muxc::TabView const& tabView)
     {
+        if (lifetime::Unloading())
+        {
+            return; // la mod si sta togliendo
+        }
         // Solo la barra schede dell'intestazione di Esplora file (non altri TabView).
         if (!IsHeaderTabView(tabView))
         {
@@ -349,7 +467,7 @@ namespace xpx::mod
 
     void ModCore::ProbeUnmanaged(bool now)
     {
-        if (!discovery::Installed() || DevSwitch("noprobe"))
+        if (!discovery::Installed() || DevSwitch("noprobe") || lifetime::Unloading())
         {
             return;
         }
@@ -625,7 +743,141 @@ namespace xpx::mod
         std::erase_if(m_deliveredAt, [&seen](auto const& entry) { return !seen.contains(entry.first); });
     }
 
-    void ModCore::BackgroundLoop()
+    void ModCore::TeardownWindow(std::shared_ptr<WindowEntry> const& entry)
+    {
+        if (entry->timer)
+        {
+            entry->timer.Stop();
+            entry->timer = nullptr;
+        }
+        if (entry->verticalTabs)
+        {
+            entry->verticalTabs->onWindowClosed = nullptr;
+            try
+            {
+                entry->verticalTabs->HandOverColors(); // la mod che rientra li rimette
+                entry->verticalTabs->Detach(/*restore*/ true); // colonna, barra, pulsanti, intestazione, agganci della finestra
+            }
+            catch (...)
+            {
+                XPX_MLOG(L"Scaricamento: errore staccando la finestra %llx (0x%08X).", entry->id, static_cast<unsigned>(winrt::to_hresult()));
+            }
+            entry->verticalTabs = nullptr; // (qui, sul thread della finestra: oggetti XAML compresi)
+        }
+        TextInput::Reset();
+        std::scoped_lock lock(m_lock);
+        std::erase(m_windows, entry);
+    }
+
+    bool ModCore::TryUnload()
+    {
+        if (!lifetime::g_unloading.exchange(true))
+        {
+            XPX_MLOG(L"Tray chiusa con \"Esci\": la mod si toglie da Esplora file.");
+        }
+        // 1. Un menu classico o una domanda della mod aperti: il nostro codice è sullo stack di quel thread (e i lavori del
+        //    dispatcher arrivano dentro il loro ciclo). Si riprova più tardi (la finestra resta normale nel frattempo).
+        if (lifetime::ModalDepth().load() > 0)
+        {
+            XPX_MLOG(L"Scaricamento rimandato: un menu o una domanda della mod è aperto.");
+            return false;
+        }
+        if (!m_tornDown)
+        {
+            // 2. Ogni finestra sul suo thread: tutto come prima della mod.
+            const auto windows = SnapshotWindows();
+            for (auto const& entry : windows)
+            {
+                if (entry->dispatcher && std::find(m_seenDispatchers.begin(), m_seenDispatchers.end(), entry->dispatcher) == m_seenDispatchers.end())
+                {
+                    m_seenDispatchers.push_back(entry->dispatcher);
+                }
+            }
+            const bool detached = RunOnEachThread(windows, 8000, [this](std::shared_ptr<WindowEntry> const& entry, auto done) {
+                return entry->dispatcher && entry->dispatcher.TryEnqueue(DispatcherQueuePriority::High, [this, entry, done] {
+                           TeardownWindow(entry);
+                           done();
+                       });
+            });
+            if (!detached)
+            {
+                XPX_MLOG(L"Scaricamento rimandato: non tutte le finestre si sono staccate in tempo.");
+                return false;
+            }
+            {
+                std::scoped_lock lock(m_lock);
+                if (!m_windows.empty())
+                {
+                    // Il thread di una finestra non esiste più: i suoi oggetti XAML si possono solo abbandonare (e i nostri
+                    // delegati che tengono fanno restare la DLL: vedi il contatore più sotto).
+                    XPX_MLOG(L"Scaricamento: %zu finestre senza thread, abbandonate.", m_windows.size());
+                    static auto* graveyard = new std::vector<std::shared_ptr<WindowEntry>>();
+                    graveyard->insert(graveyard->end(), m_windows.begin(), m_windows.end());
+                    m_windows.clear();
+                }
+            }
+            // 3. Agganci: di nuovo le funzioni originali di Esplora file.
+            if (!discovery::Uninstall() || !glass::Uninstall())
+            {
+                XPX_MLOG(L"Scaricamento impossibile: un aggancio non si può togliere (la mod resta, spenta).");
+                return false;
+            }
+            m_tornDown = true;
+            XPX_MLOG(L"Scaricamento: %zu finestre staccate, agganci tolti.", windows.size());
+        }
+        // 4. Nessuno dentro i nostri agganci: i contatori, poi un giro del ciclo di ogni thread delle finestre (chi era entrato
+        //    prima del ripristino ne è uscito quando il suo thread torna al ciclo dei messaggi), poi un attimo di margine.
+        if (!WaitUntil([] { return discovery::InFlight() == 0 && glass::InFlight() == 0; }, 3000))
+        {
+            XPX_MLOG(L"Scaricamento rimandato: chiamate ancora dentro i nostri agganci.");
+            return false;
+        }
+        if (!RunOnEachThread(m_seenDispatchers, 5000,
+                             [](winrt::Microsoft::UI::Dispatching::DispatcherQueue const& dispatcher, auto done) {
+                                 return dispatcher.TryEnqueue(DispatcherQueuePriority::Low, [done] { done(); });
+                             }))
+        {
+            XPX_MLOG(L"Scaricamento rimandato: un thread delle finestre non risponde.");
+            return false;
+        }
+        Sleep(300);
+        // 5. Il thread delle letture della barra delle cartelle.
+        if (!NavItems::Instance().Stop(5000))
+        {
+            return false;
+        }
+        // 6. Oggetti nostri ancora vivi (delegati degli eventi XAML, oggetti COM dati alla shell): solo a zero la DLL può
+        //    uscire, altrimenti Esplora file chiamerebbe codice che non c'è più.
+        if (!WaitUntil([] { return static_cast<uint32_t>(winrt::get_module_lock()) == 0; }, 5000))
+        {
+            XPX_MLOG(L"Scaricamento rimandato: %u oggetti della mod ancora vivi in Esplora file.", static_cast<uint32_t>(winrt::get_module_lock()));
+            return false;
+        }
+        // 7. Classi di finestra (falliscono se ne esiste ancora una finestra: allora la DLL resta).
+        if (!CaptionButtons::UnregisterWindowClass() || !ModernMenu::UnregisterWindowClass())
+        {
+            XPX_MLOG(L"Scaricamento rimandato: una finestra della mod esiste ancora (%lu).", GetLastError());
+            return false;
+        }
+        m_seenDispatchers.clear();
+        return true;
+    }
+
+    void ModCore::Resume()
+    {
+        XPX_MLOG(L"Tray di nuovo avviata prima dello scaricamento: la mod riparte.");
+        m_tornDown = false;
+        m_seenDispatchers.clear();
+        m_probes.clear();
+        lifetime::g_unloading = false;
+        if (!DevSwitch("noglass"))
+        {
+            glass::Install();
+        }
+        StartDiscovery();
+    }
+
+    bool ModCore::BackgroundLoop()
     {
         ULONGLONG stamp = ModSettings::FileStamp();
         // Ci si sveglia quando cambia qualcosa nella cartella dei dati (impostazioni, elenco e comandi dei
@@ -641,10 +893,18 @@ namespace xpx::mod
         {
             XPX_MLOG(L"Notifiche della cartella dei dati non disponibili (%lu): controllo ogni secondo.", GetLastError());
         }
-        DeliverPendingColors();
+        if (!CurrentSettings().trayExited)
+        {
+            DeliverPendingColors();
+        }
+        bool first = true;
         for (;;)
         {
-            if (watching)
+            if (first)
+            {
+                first = false; // (subito: la tray può essere già stata chiusa mentre si cercavano le finestre)
+            }
+            else if (watching)
             {
                 const DWORD result = WaitForMultipleObjects(2, changes, FALSE, 5000);
                 if (result == WAIT_OBJECT_0 || result == WAIT_OBJECT_0 + 1)
@@ -657,9 +917,6 @@ namespace xpx::mod
             {
                 Sleep(1000);
             }
-            DeliverPendingColors();
-            // Rete di sicurezza: una finestra visibile che nessun aggancio ha presentato si cerca con UI Automation.
-            ProbeUnmanaged(/*now*/ false);
             const ULONGLONG current = ModSettings::FileStamp();
             if (current != stamp)
             {
@@ -676,7 +933,7 @@ namespace xpx::mod
                 }
                 if (loaded.trayExited != wasExited)
                 {
-                    XPX_MLOG(loaded.trayExited ? L"Tray chiusa con \"Esci\": la mod si spegne in tutte le finestre (come con le funzioni spente)."
+                    XPX_MLOG(loaded.trayExited ? L"Tray chiusa con \"Esci\": la mod si spegne in tutte le finestre e si toglie da Esplora file."
                                                : L"Tray di nuovo avviata: la mod si riaccende con le impostazioni salvate.");
                 }
                 if (changed)
@@ -686,6 +943,30 @@ namespace xpx::mod
                     ApplySettingsToAllWindows();
                 }
             }
+            if (CurrentSettings().trayExited)
+            {
+                // Le finestre sono già tornate normali (impostazioni spente); ora via tutto e la DLL esce. Se non si può
+                // ancora (un menu aperto, un oggetto ancora vivo), si riprova al prossimo giro (al più 5 s).
+                if (TryUnload())
+                {
+                    for (HANDLE change : changes)
+                    {
+                        if (change != INVALID_HANDLE_VALUE)
+                        {
+                            FindCloseChangeNotification(change);
+                        }
+                    }
+                    return true;
+                }
+                continue;
+            }
+            if (m_tornDown || lifetime::Unloading())
+            {
+                Resume(); // la tray è ripartita prima che la DLL uscisse
+            }
+            DeliverPendingColors();
+            // Rete di sicurezza: una finestra visibile che nessun aggancio ha presentato si cerca con UI Automation.
+            ProbeUnmanaged(/*now*/ false);
             if (GetFileAttributesW(DumpRequestFile().c_str()) != INVALID_FILE_ATTRIBUTES)
             {
                 // Contenuto: l'HWND (esadecimale) della finestra di prova da esportare.

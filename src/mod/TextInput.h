@@ -16,5 +16,7 @@ namespace xpx::mod
         // main: la finestra principale di Esplora file a cui appartiene la casella.
         static void Begin(HWND main);
         static void End(HWND main);
+        // Scaricamento della mod, sul thread di una finestra: toglie l'hook di questo thread se c'è ancora.
+        static void Reset();
     };
 }

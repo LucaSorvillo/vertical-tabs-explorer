@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — 2026-11-07
+
+- **Exit** now removes the app from File Explorer completely: the module puts back everything it changed and
+  unloads itself, so nothing of the app stays loaded. Starting the app again brings everything back, tab colors
+  included.
+- Updates take effect at once: the setup closes the app, the old module leaves and the new one comes in, without
+  restarting File Explorer (from this version on).
+
 ## 1.4.2 — 2026-11-07
 
 - **Exit** in the tray menu now turns the vertical tabs and the folders bar off in the open windows right away

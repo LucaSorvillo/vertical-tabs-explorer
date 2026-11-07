@@ -50,6 +50,10 @@ namespace xpx::mod
         // Colori da rimettere nelle schede di una finestra appena riaperta dalla tray (pending-<hwnd>.txt):
         // valgono solo per questa finestra, e si applicano appena ha tutte le schede.
         void OfferPendingColors(HWND window, TabColorList const& list);
+        // La mod esce dal processo ("Esci" della tray): i colori delle schede, solo in memoria, restano come "da rimettere" (lo
+        // stesso file che la tray scrive per le finestre riaperte). La mod che rientra li rimette; intanto la tray li legge come i
+        // colori della finestra.
+        void HandOverColors();
 
         // La finestra di Esplora file si sta chiudendo (chiamato sul suo thread, una volta).
         std::function<void()> onWindowClosed;

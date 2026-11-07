@@ -205,6 +205,24 @@ namespace xpx
             return std::none_of(processes.begin(), processes.end(), [&attempt](ProcessWindows const& p) { return p.pid == attempt.pid; });
         });
 
+        // La mod si toglie da sola dopo "Esci": un processo sorvegliato può non averla più (tray ripartita mentre usciva).
+        // Ogni 5 s si controlla; senza mod il processo torna fra quelli da iniettare (subito qui sotto).
+        if (wanted && now - m_lastVerify >= 5000)
+        {
+            m_lastVerify = now;
+            for (auto it = m_tracked.begin(); it != m_tracked.end();)
+            {
+                if (WaitForSingleObject(it->process, 0) == WAIT_TIMEOUT && !IsModLoaded(it->pid))
+                {
+                    Log(L"Schede verticali: la mod non è più nel processo %lu, la si rimette.", it->pid);
+                    CloseHandle(it->process);
+                    it = m_tracked.erase(it);
+                    continue;
+                }
+                ++it;
+            }
+        }
+
         std::wstring dll;
         for (auto const& [pid, settled] : processes)
         {

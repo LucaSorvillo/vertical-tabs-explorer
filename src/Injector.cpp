@@ -134,6 +134,27 @@ namespace xpx
             return false;
         }
 
+        // Un solo iniettore alla volta per processo (la tray e --inject-pid sono processi diversi): due LoadLibraryW della
+        // stessa DLL lascerebbero due riferimenti, e allo scaricamento ("Esci") la DLL resterebbe nel processo.
+        UniqueHandle gate(CreateMutexW(nullptr, FALSE, (L"Local\\VTabsExplorer.Inject." + std::to_wstring(pid)).c_str()));
+        const bool gated = gate && WaitForSingleObject(gate.value, 20000) != WAIT_TIMEOUT;
+        struct Release
+        {
+            HANDLE mutex;
+            bool held;
+            ~Release()
+            {
+                if (held)
+                {
+                    ReleaseMutex(mutex);
+                }
+            }
+        } const release{ gate.value, gated };
+        if (IsModLoaded(pid))
+        {
+            return true; // già dentro (iniettata da un altro mentre si aspettava)
+        }
+
         UniqueHandle process(OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE |
                                              PROCESS_VM_READ | SYNCHRONIZE,
                                          FALSE, pid));

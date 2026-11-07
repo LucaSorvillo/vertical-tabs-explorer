@@ -38,6 +38,9 @@ namespace xpx::mod
         ModernMenu(HWND owner, Callbacks callbacks);
         ~ModernMenu();
         ModernMenu(ModernMenu const&) = delete;
+
+        // Scaricamento della mod: toglie la classe della finestra dei messaggi (false se ne esiste ancora una).
+        static bool UnregisterWindowClass();
         ModernMenu& operator=(ModernMenu const&) = delete;
 
         enum class ShowResult

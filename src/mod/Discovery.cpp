@@ -30,6 +30,22 @@ namespace xpx::mod::discovery
         std::atomic<bool> g_blocked{ false }; // XFG attivo: agganci impossibili per sempre in questo processo
         std::atomic<int> g_probes{ 0 };       // ricerche UI Automation nostre in corso
         std::mutex g_installLock;
+        // Voci delle vtable sostituite (per rimetterle allo scaricamento) e chiamate in corso nei nostri agganci.
+        void** g_templateEntry = nullptr;
+        void** g_controlTypeEntry = nullptr;
+        std::atomic<int> g_inFlight{ 0 };
+
+        struct InFlightScope
+        {
+            InFlightScope() noexcept
+            {
+                ++g_inFlight;
+            }
+            ~InFlightScope()
+            {
+                --g_inFlight;
+            }
+        };
 
         void Notify(muxc::TabView const& tabView) noexcept
         {
@@ -55,6 +71,7 @@ namespace xpx::mod::discovery
 
         int32_t __stdcall OnApplyTemplateHook(void* self) noexcept
         {
+            const InFlightScope inFlight;
             // Prima l'originale: il modello della barra deve essere applicato come sempre.
             const int32_t result = g_onApplyTemplate.load()(self);
             try
@@ -74,6 +91,7 @@ namespace xpx::mod::discovery
 
         int32_t __stdcall GetControlTypeHook(void* self, int32_t* type) noexcept
         {
+            const InFlightScope inFlight;
             const int32_t result = g_getControlType.load()(self, type);
             if (g_probes.load() > 0)
             {
@@ -128,13 +146,14 @@ namespace xpx::mod::discovery
         // Sostituisce la voce slot della vtable dell'interfaccia abi con hook; original riceve la funzione di prima PRIMA
         // dello scambio (una chiamata che arriva subito dopo trova già l'originale). Idempotente.
         template <typename Fn>
-        bool PatchSlot(void* abi, size_t slot, void* hook, std::atomic<Fn>& original)
+        bool PatchSlot(void* abi, size_t slot, void* hook, std::atomic<Fn>& original, void**& patched)
         {
             void** vtable = *static_cast<void***>(abi);
             void** entry = vtable + slot;
             void* const current = *entry;
             if (current == hook)
             {
+                patched = entry;
                 return true; // già nostro
             }
             if (ModuleHasXfg(current) || ModuleHasXfg(vtable))
@@ -153,7 +172,39 @@ namespace xpx::mod::discovery
             const bool swapped = InterlockedCompareExchangePointer(entry, hook, current) == current;
             DWORD ignored = 0;
             VirtualProtect(entry, sizeof(void*), protection, &ignored);
+            if (swapped)
+            {
+                patched = entry;
+            }
             return swapped;
+        }
+
+        // Rimette la funzione originale nella voce, se è ancora la nostra. La funzione originale resta in original: una chiamata
+        // già entrata nel nostro aggancio la usa ancora.
+        template <typename Fn>
+        bool RestoreSlot(void**& entry, void* hook, std::atomic<Fn> const& original)
+        {
+            if (!entry)
+            {
+                return true;
+            }
+            void* const restored = reinterpret_cast<void*>(original.load());
+            DWORD protection = 0;
+            if (!restored || !VirtualProtect(entry, sizeof(void*), PAGE_READWRITE, &protection))
+            {
+                XPX_MLOG(L"Agganci: voce della vtable non ripristinabile (%lu).", GetLastError());
+                return false;
+            }
+            const bool ours = InterlockedCompareExchangePointer(entry, restored, hook) == hook;
+            DWORD ignored = 0;
+            VirtualProtect(entry, sizeof(void*), protection, &ignored);
+            if (!ours)
+            {
+                XPX_MLOG(L"Agganci: la voce della vtable non è più la nostra (un altro aggancio sopra): la mod non si scarica.");
+                return false;
+            }
+            entry = nullptr;
+            return true;
         }
 
         bool InstallOnThisThread()
@@ -163,7 +214,8 @@ namespace xpx::mod::discovery
                 // Istanze nostre, mai in un albero: servono solo per arrivare alle vtable delle classi.
                 muxc::TabView tabView;
                 const auto overrides = tabView.as<mux::IFrameworkElementOverrides>();
-                const bool template_ = PatchSlot(winrt::get_abi(overrides), kOnApplyTemplateSlot, reinterpret_cast<void*>(&OnApplyTemplateHook), g_onApplyTemplate);
+                const bool template_ =
+                    PatchSlot(winrt::get_abi(overrides), kOnApplyTemplateSlot, reinterpret_cast<void*>(&OnApplyTemplateHook), g_onApplyTemplate, g_templateEntry);
 
                 muxc::TabViewItem item;
                 const auto peer = muxap::FrameworkElementAutomationPeer::CreatePeerForElement(item);
@@ -171,7 +223,7 @@ namespace xpx::mod::discovery
                 const auto peerOverrides = peer ? peer.try_as<muxap::IAutomationPeerOverrides>() : nullptr;
                 const bool automation = peerOverrides &&
                                         PatchSlot(winrt::get_abi(peerOverrides), kGetAutomationControlTypeCoreSlot, reinterpret_cast<void*>(&GetControlTypeHook),
-                                                  g_getControlType);
+                                                  g_getControlType, g_controlTypeEntry);
                 XPX_MLOG(L"Agganci: OnApplyTemplate di TabView %s, GetAutomationControlTypeCore di %s %s.", template_ ? L"installato" : L"NON installato",
                          peerType.c_str(), automation ? L"installato" : L"NON installato");
                 return template_ && automation;
@@ -254,7 +306,9 @@ namespace xpx::mod::discovery
         // Il lavoro va fatto sul thread della finestra (XAML è legato al suo thread): un gancio WH_CALLWNDPROC solo su quel
         // thread, poi un messaggio nostro mandato alla finestra; il gancio lo vede prima della finestra.
         g_installResult = -1;
-        const HHOOK hook = SetWindowsHookExW(WH_CALLWNDPROC, InstallProc, g_module, thread);
+        // hMod NULL: un thread di questo processo e la funzione nel nostro codice (con il modulo, user32 lo caricherebbe di
+        // nuovo per il thread, e quel riferimento in più terrebbe la DLL nel processo dopo "Esci").
+        const HHOOK hook = SetWindowsHookExW(WH_CALLWNDPROC, InstallProc, nullptr, thread);
         if (!hook)
         {
             XPX_MLOG(L"Agganci: SetWindowsHookEx non riuscita (%lu).", GetLastError());
@@ -266,6 +320,22 @@ namespace xpx::mod::discovery
         const bool ok = g_installResult.load() == 1;
         g_installed = ok;
         return ok;
+    }
+
+    bool Uninstall()
+    {
+        std::scoped_lock lock(g_installLock);
+        g_callback = nullptr; // un aggancio già in corso non presenta più nulla
+        const bool template_ = RestoreSlot(g_templateEntry, reinterpret_cast<void*>(&OnApplyTemplateHook), g_onApplyTemplate);
+        const bool automation = RestoreSlot(g_controlTypeEntry, reinterpret_cast<void*>(&GetControlTypeHook), g_getControlType);
+        g_installed = !(template_ && automation) ? g_installed.load() : false;
+        XPX_MLOG(L"Agganci: funzioni originali rimesse nelle vtable (%s).", template_ && automation ? L"tutte" : L"NON tutte");
+        return template_ && automation;
+    }
+
+    int InFlight()
+    {
+        return g_inFlight.load();
     }
 
     bool Probe(HWND window)
