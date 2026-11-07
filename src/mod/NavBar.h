@@ -35,7 +35,8 @@ namespace xpx::mod
     //
     // Cartelle trascinate da fuori (Esplora file, il desktop, un altro programma), come i link sulla barra dei segnalibri
     // di Chrome: lasciate nella barra si aggiungono ad Accesso rapido in quel punto, lasciate al centro di un gruppo ci
-    // entrano (NavDrop.h; bersaglio OLE dell'isola, vedi OnExternalDragEnter).
+    // entrano, e fermandosi su un gruppo (o su "»") il suo elenco si apre per lasciarle nel punto voluto (NavDrop.h;
+    // bersaglio OLE dell'isola e delle finestre degli elenchi, vedi OnExternalDragEnter).
     //
     // Una NOSTRA isola XAML (DesktopWindowXamlSource, Mica Alt come la barra del titolo) che WindowLayout
     // mette tra l'intestazione e il contenuto. Vive e si usa sul thread UI della finestra (la possiede
@@ -73,9 +74,10 @@ namespace xpx::mod
         // vedi DevGroupCommand in NavBar.cpp.
         void DevCommand(std::wstring const& command);
 
-        // Trascinamento da fuori, dal bersaglio OLE dell'isola (NavDrop.cpp), sul thread della finestra. Restituiscono
-        // l'effetto: DROPEFFECT_LINK (o COPY se la sorgente non ammette il collegamento), mai MOVE: Esplora file sposterebbe
-        // la cartella. Gli elenchi non si aprono (finestre a parte, senza bersaglio): si lascia nella barra o su un gruppo.
+        // Trascinamento da fuori, dal bersaglio OLE dell'isola o della finestra di un elenco (NavDrop.cpp), sul thread della
+        // finestra. Restituiscono l'effetto: DROPEFFECT_LINK (o COPY se la sorgente non ammette il collegamento), mai MOVE:
+        // Esplora file sposterebbe la cartella. Passando dalla barra a un elenco (o viceversa) Windows dà un'uscita e
+        // un'entrata: il trascinamento continua (vedi OnExternalTick).
         DWORD OnExternalDragEnter(IDataObject* data, POINT screen, DWORD allowed);
         DWORD OnExternalDragOver(POINT screen, DWORD allowed);
         void OnExternalDragLeave();
@@ -120,6 +122,10 @@ namespace xpx::mod
             std::vector<Row> rows;
             size_t firstEntry = 0;  // "»": voce della barra della prima riga
             bool open = false;
+            // Aperto durante un trascinamento da fuori: la sua finestra (Microsoft.UI.Content.PopupWindowSiteBridge) e se ha il
+            // nostro bersaglio OLE (tolto alla chiusura).
+            HWND dropWindow = nullptr;
+            bool dropRegistered = false;
         };
 
         // Dove andrà la voce trascinata.
@@ -264,6 +270,8 @@ namespace xpx::mod
         // Ogni 16 ms durante il trascinamento: staccato, cursore e tasto (rilascio = si lascia lì, anche fuori dalla barra e
         // dagli elenchi); fermi su un gruppo o su "»", il suo elenco.
         void OnDragTimer();
+        // Fermi da kOpenListAfterMs su un gruppo (o su "»"): si apre il suo elenco (trascinamento della barra e da fuori).
+        void OpenHoveredLevel();
         void DetachDrag();
         // Fine del trascinamento staccato: si lascia sul bersaglio dell'ultimo punto; DropDragged sposta la voce.
         void FinishDrag();
@@ -291,6 +299,7 @@ namespace xpx::mod
             std::vector<DroppedFolder> folders;  // le sue cartelle (vuoto: niente da aggiungere)
             winrt::com_ptr<IDataObject> data;    // per la descrizione accanto all'immagine
             std::wstring described;              // descrizione messa ("" = nessuna)
+            ULONGLONG leftAt = 0;                // uscito da barra o elenco (0 = sopra uno dei due): finito se non rientra
         };
         // Cartella appena aggiunta da un trascinamento: quando la lettura nuova la porta va nel posto scelto (in un gruppo, o
         // accanto a un gruppo), e l'ordine di Windows segue, come trascinandola dalla barra.
@@ -308,6 +317,19 @@ namespace xpx::mod
         // livello: la prima cartella da lì in poi (vuoto: in fondo).
         std::vector<uint8_t> WindowsAnchorFor(std::wstring const& before) const;
         void PlacePendingDrops();
+        // Ogni 16 ms durante un trascinamento da fuori: bersaglio sulle finestre degli elenchi appena aperti, elenco che si
+        // apre restando fermi, e la fine se il trascinamento è uscito da barra ed elenchi senza rientrare.
+        void OnExternalTick();
+        // Fine (rilascio, o uscita): linea e descrizione via, e gli elenchi aperti si chiudono appena finita la chiamata OLE.
+        void EndExternalDrag();
+        void AttachLevelDropTargets();
+        void DetachLevelDropTarget(Level& level);
+        // La finestra a comparsa dell'elenco aperto (della finestra principale, sul nostro thread), se si trova.
+        HWND FindLevelWindow(Level const& level) const;
+        // Dove si vede l'elenco aperto (pixel dello schermo).
+        std::optional<RECT> LevelScreenRect(Level const& level) const;
+        // Il punto è sulla barra o su un elenco aperto, o lì accanto (lo spazio tra la barra e un elenco).
+        bool NearBarOrLevels(POINT screen) const;
 
         void DevGroupCommand(std::wstring const& command);
         std::wstring KeyByName(std::wstring const& reference) const;

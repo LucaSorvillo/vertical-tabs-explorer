@@ -275,9 +275,9 @@ function Get-OverflowNames([uint32]$ProcessId, [int64]$Main) { @(Get-OverflowBut
 # Tutte le voci, barra ed elenco "»", in ordine
 function Get-AllNames([int64]$Main) {
     $buttons = @(Get-BarButtons (Get-Islands $Main).Bar)
-    $bar = @($buttons | ForEach-Object { $_.Current.Name } | Where-Object { $_ -ne 'Altre cartelle' })
+    $bar = @($buttons | ForEach-Object { $_.Current.Name } | Where-Object { $_ -ne (Ui 'More folders' 'Altre cartelle') })
     $list = @()
-    if (@($buttons | Where-Object { $_.Current.Name -eq 'Altre cartelle' }).Count -gt 0) {
+    if (@($buttons | Where-Object { $_.Current.Name -eq (Ui 'More folders' 'Altre cartelle') }).Count -gt 0) {
         Send-ModCommand $Main 'navbar more'
         $list = @(Get-OverflowNames $sepPid $Main)
         Send-ModCommand $Main 'navbar closemenu'
@@ -463,7 +463,7 @@ function Get-MenuItems([int64]$Main) {
 }
 function Find-MenuItemById([int64]$Main, [string]$Id) { Get-MenuItems $Main | Where-Object { $_.Id -eq $Id } | Select-Object -First 1 -ExpandProperty Element }
 # Nome di una scheda da stampare: quelli di prova e di sistema così come sono, gli altri no
-function Short-TabName([string]$Name) { if ($Name -in 'A', 'B', 'C', 'D', 'Home', 'Questo PC', 'Galleria' -or $Name -like 'xpx-pin-*') { $Name } else { '<altra>' } }
+function Short-TabName([string]$Name) { if ($Name -in 'A', 'B', 'C', 'D', 'Home', 'Questo PC', 'Galleria', 'This PC', 'Gallery' -or $Name -like 'xpx-pin-*') { $Name } else { '<altra>' } }
 function Read-ClassicMenu([IntPtr]$MenuWindow) {
     $hmenu = [NavKit]::SendMessage($MenuWindow, 0x01E1, [IntPtr]::Zero, [IntPtr]::Zero)
     $n = [NavKit]::GetMenuItemCount($hmenu)
@@ -541,8 +541,8 @@ try {
     # Voci: barra + menu "»" = riquadro nativo, tutte e nello stesso ordine (gli indici dei comandi di prova sono questi)
     $nativeAll = @([NavKit]::NativeNav($c.Tree))
     $buttons = @(Get-BarButtons $isl.Bar)
-    $inBar = @($buttons | ForEach-Object { $_.Current.Name } | Where-Object { $_ -ne 'Altre cartelle' })
-    $hasMore = @($buttons | Where-Object { $_.Current.Name -eq 'Altre cartelle' }).Count -gt 0
+    $inBar = @($buttons | ForEach-Object { $_.Current.Name } | Where-Object { $_ -ne (Ui 'More folders' 'Altre cartelle') })
+    $hasMore = @($buttons | Where-Object { $_.Current.Name -eq (Ui 'More folders' 'Altre cartelle') }).Count -gt 0
     Send-ModCommand $w 'navbar more'
     $menu = @(Get-OverflowNames $sepPid $w)
     Send-ModCommand $w 'navbar closemenu'
@@ -565,12 +565,12 @@ try {
     Check 'divisori come nel riquadro di sistema (prima e dopo le cartelle aggiunte)' ($nativeDividers -and $barDividers -eq $nativeDividers) "barra $barDividers, riquadro $nativeDividers"
 
     # Clic su un pulsante (UI Automation: come un clic del mouse) e voci aperte con i comandi di prova
-    $gallery = $buttons | Where-Object { $_.Current.Name -eq 'Galleria' } | Select-Object -First 1
+    $gallery = $buttons | Where-Object { $_.Current.Name -eq (Ui 'Gallery' 'Galleria') } | Select-Object -First 1
     $before = (Get-ActivePath $w).Paths
     if ($gallery) { $gallery.GetCurrentPattern([Windows.Automation.InvokePattern]::Pattern).Invoke() }
     $ok = Wait-Until { (Get-ActivePath $w).Paths -contains '::{E88865EA-0E1C-4E20-9AA6-EDCD0212C87C}' } 6000
     Check 'clic su "Galleria": la scheda attiva va lì' ($gallery -and $ok -and (Get-ActivePath $w).Count -eq 3) (((Get-ActivePath $w).Paths | ForEach-Object { if ($_ -like '::*') { $_ } else { Short $_ } }) -join ' | ')
-    $pc = [array]::IndexOf($nativeAll, 'Questo PC')
+    $pc = [array]::IndexOf($nativeAll, (Ui 'This PC' 'Questo PC'))
     Send-ModCommand $w "navbar open $pc"
     $ok = Wait-Until { (Get-ActivePath $w).Paths -contains '::{20D04FE0-3AEA-1069-A2D8-08002B30309D}' } 6000
     Check '"Questo PC" (dal menu »): si apre nella scheda attiva' ($pc -ge 0 -and $ok -and (Get-ActivePath $w).Count -eq 3) "voce $pc"
@@ -627,7 +627,7 @@ try {
     $moveLines = @(ModLines $from | Where-Object { $_ -match "\[\s*$sepPid\:.*cartella aggiunta spostata" })
     Check '  spostamento in Windows riuscito (PinItem)' ($moveLines.Count -eq 1 -and $moveLines[0] -match ': 0x00000000,') (($moveLines | ForEach-Object { $_ -replace '^.*NavItems: ', '' }) -join ' / ')
     # La Home (aperta dopo) mostra lo stesso ordine nella sezione Accesso rapido
-    Send-ModCommand $w "navbar open $([array]::IndexOf($o.All, 'Questo PC'))"
+    Send-ModCommand $w "navbar open $([array]::IndexOf($o.All, (Ui 'This PC' 'Questo PC')))"
     Send-ModCommand $w "navbar open $([array]::IndexOf($o.All, 'Home'))"
     $homeOrder = ''
     Wait-Until { $script:homeOrder = Get-HomeOrder $w; $script:homeOrder -eq 'xpx-pin-3,xpx-pin-1,xpx-pin-2' } 8000 | Out-Null
@@ -801,7 +801,7 @@ try {
         Check '  l''elenco si chiude dopo averla lasciata nella barra' $closed
         # 5) Dalla barra all'elenco: fermi su » l'elenco si apre; lasciata nella metà bassa della sua prima voce
         [void][NavMouse]::SetForegroundWindow([IntPtr]$w); Start-Sleep -Milliseconds 300
-        $b1 = Find-BarButton $w 'xpx-pin-1'; $more = Find-BarButton $w 'Altre cartelle'
+        $b1 = Find-BarButton $w 'xpx-pin-1'; $more = Find-BarButton $w (Ui 'More folders' 'Altre cartelle')
         $from = LogCount
         $firstName = $null
         if ($b1 -and $more) {
@@ -898,11 +898,11 @@ try {
     # Finestra stretta: meno voci nella barra, le altre nel menu
     Move-TestWindow $w 80 60 760 700
     Start-Sleep -Milliseconds 1500
-    $narrow = @(Get-BarButtons (Get-Islands $w).Bar | Where-Object { $_.Current.Name -ne 'Altre cartelle' }).Count
+    $narrow = @(Get-BarButtons (Get-Islands $w).Bar | Where-Object { $_.Current.Name -ne (Ui 'More folders' 'Altre cartelle') }).Count
     Check 'finestra più stretta: meno voci nella barra' ($narrow -gt 0 -and $narrow -lt $inBar.Count) "$narrow invece di $($inBar.Count)"
     Move-TestWindow $w 80 60 1100 700
     Start-Sleep -Milliseconds 1500
-    Check '  più larga: tornano' (@(Get-BarButtons (Get-Islands $w).Bar | Where-Object { $_.Current.Name -ne 'Altre cartelle' }).Count -eq $inBar.Count)
+    Check '  più larga: tornano' (@(Get-BarButtons (Get-Islands $w).Bar | Where-Object { $_.Current.Name -ne (Ui 'More folders' 'Altre cartelle') }).Count -eq $inBar.Count)
 
     # Spenta: tutto come prima (riquadro nativo, contenuto sotto l'intestazione)
     $before = LogCount

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0 — 2026-11-07
+
+- Folders bar: while you drag a folder in from File Explorer (or the desktop, or another app), stop on a group
+  (or on "»") for a moment to open its list, like Chrome's bookmark folders. Then drop the folder exactly where
+  you want it in the list, in a subgroup too. The lists close when you drop the folder or drag it away.
+- Folders dragged from apps that only offer file paths (another file manager, an editor) are accepted too.
+
 ## 1.3.0 — 2026-11-07
 
 - Folders bar: drag a folder from File Explorer (or the desktop, or another app) onto the bar to pin it to Quick

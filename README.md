@@ -69,8 +69,9 @@ without the vertical tabs.
   and the taskbar jump list follow it.
 - **Drag a folder from File Explorer** (or from the desktop, or another app) **onto the bar** to pin it to
   Quick Access right there, like a link dropped on Chrome's bookmarks bar. Drop it on the middle of a group to
-  put it in that group. Files aren't accepted, and the folder itself isn't moved or copied. Windows lists at
-  most 50 Quick Access folders, and the bar shows the same ones.
+  put it in that group, or stop on the group for a moment: its list opens, and you can drop the folder exactly
+  where you want it, in a subgroup too (the same for the "»" list). Files aren't accepted, and the folder
+  itself isn't moved or copied. Windows lists at most 50 Quick Access folders, and the bar shows the same ones.
 - **Groups**: collect folders and other groups, nested as deep as you like.
   - Click a group to open its list. Once a list is open, hovering another group switches to it at once, like
     in Chrome.
@@ -84,7 +85,8 @@ without the vertical tabs.
 | ![A group with a subgroup open](docs/assets/explorer-groups.png) | ![The Windows 11 context menu on a folder of the bar](docs/assets/explorer-context-menu.png) |
 
 **Drag a folder onto a group** and stop for a moment: the group opens, and you can drop the folder exactly
-where you want it. This works from the bar, from a group's list and from one group to another.
+where you want it. This works from the bar, from a group's list, from one group to another, and for folders
+dragged in from File Explorer.
 
 ![Dragging a folder into a group](docs/assets/explorer-drag-group.gif)
 

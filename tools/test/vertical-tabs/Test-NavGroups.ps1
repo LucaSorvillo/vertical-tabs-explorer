@@ -318,7 +318,7 @@ try {
     "--- gruppo vuoto"
     Send-Group $w 'new xpxE'
     for ($k = 0; $k -lt 3 -and (Get-GroupDump $w).Open -notmatch 'g:xpxE'; $k++) { Send-Group $w 'show xpxE' }
-    $empty = Find-PopupElement $w ([Windows.Automation.ControlType]::Text) 'Gruppo vuoto'
+    $empty = Find-PopupElement $w ([Windows.Automation.ControlType]::Text) (Ui 'Empty group' 'Gruppo vuoto')
     Check 'gruppo vuoto: l''elenco dice "(vuoto)"' ($null -ne $empty) "$(Format-Popups $w); aperti: $((Get-GroupDump $w).Open)"
     Send-ModCommand $w 'navbar closemenu'
     Wait-Until { @(Get-Popups $w).Count -eq 0 } 3000 | Out-Null
@@ -410,7 +410,7 @@ try {
     Check '  lasciata nel suo elenco sopra la prima riga: xpxE [xpx-pin-2, xpx-pin-1]; l''elenco resta aperto e aggiornato' ($row -and $d.Groups['xpxE'] -eq 'f:xpx-pin-2,f:xpx-pin-1' -and $d.Groups['xpxA'] -eq 'g:xpxB' -and $d.Open -eq 'g:xpxE' -and $bad -eq 0 -and (Wait-Until { Test-PopupList $w 'xpx-pin-2,xpx-pin-1' } 2000) -and (Test-TopOrder $d)) "$(Format-Dump $d); annullati o fuori posto: $bad; $(Format-Popups $w); Windows: $(Get-WindowsOrder)"
     # Il pulsante del gruppo resta lo stesso (il suo elenco è rimasto aperto); il suggerimento dice il contenuto nuovo
     $tipE = "$($d.Tips['g:xpxE'])"; $tipA = "$($d.Tips['g:xpxA'])"
-    Check '  suggerimenti dei due gruppi nella barra col contenuto nuovo (xpxE 2 cartelle, xpxA 1 gruppo)' ($tipE -eq '2 cartelle' -and $tipA -eq '1 gruppo') "xpxE: $tipE; xpxA: $tipA"
+    Check '  suggerimenti dei due gruppi nella barra col contenuto nuovo (xpxE 2 cartelle, xpxA 1 gruppo)' ($tipE -eq (Ui '2 folders' '2 cartelle') -and $tipA -eq (Ui '1 group' '1 gruppo')) "xpxE: $tipE; xpxA: $tipA"
     # Da un sottogruppo (elenco di profondità 1): fermi su un gruppo della barra si chiudono gruppo e sottogruppo, si apre il suo
     Send-ModCommand $w 'navbar closemenu'
     Wait-Until { @(Get-Popups $w).Count -eq 0 } 3000 | Out-Null
@@ -440,9 +440,9 @@ try {
     Send-Group $w 'menu xpxA'
     Wait-Until { @(Get-MenuItems $w).Count -gt 0 } 3000 | Out-Null
     $names = @(Get-MenuItems $w | ForEach-Object { $_.Name })
-    Check 'clic destro sul gruppo: Apri tutte (2), Nuovo gruppo, Rinomina, Elimina gruppo' (($names -join '|') -eq "Apri tutte (2)|Nuovo gruppo$([char]0x2026)|Rinomina$([char]0x2026)|Elimina gruppo") ($names -join ' | ')
+    Check 'clic destro sul gruppo: Apri tutte (2), Nuovo gruppo, Rinomina, Elimina gruppo' (($names -join '|') -eq "$(Ui 'Open all (2)' 'Apri tutte (2)')|$(Ui 'New group' 'Nuovo gruppo')$([char]0x2026)|$(Ui 'Rename' 'Rinomina')$([char]0x2026)|$(Ui 'Delete group' 'Elimina gruppo')") ($names -join ' | ')
     $tabsBefore = @(Get-TabNamesSafe $w)
-    $item = Get-MenuItems $w | Where-Object { $_.Name -eq 'Apri tutte (2)' } | Select-Object -First 1
+    $item = Get-MenuItems $w | Where-Object { $_.Name -eq (Ui 'Open all (2)' 'Apri tutte (2)') } | Select-Object -First 1
     if ($item) { Invoke-Element $item.Element }
     $ok = Wait-Until { @(Get-TabNamesSafe $w).Count -ge $tabsBefore.Count + 2 } 8000
     Start-Sleep -Milliseconds 800
@@ -461,26 +461,26 @@ try {
     "--- rinomina e gruppo nuovo con il riquadro del nome"
     Send-Group $w 'menu xpxA'
     $script:rename = $null
-    if (Wait-Until { $script:rename = Get-MenuItems $w | Where-Object { $_.Name -eq "Rinomina$([char]0x2026)" } | Select-Object -First 1; $null -ne $script:rename } 3000) { Invoke-Element $script:rename.Element }
+    if (Wait-Until { $script:rename = Get-MenuItems $w | Where-Object { $_.Name -eq "$(Ui 'Rename' 'Rinomina')$([char]0x2026)" } | Select-Object -First 1; $null -ne $script:rename } 3000) { Invoke-Element $script:rename.Element }
     $script:box = $null
-    $ok = Wait-Until { $script:box = Find-PopupElement $w ([Windows.Automation.ControlType]::Edit) 'Nome del gruppo'; $null -ne $script:box } 4000
+    $ok = Wait-Until { $script:box = Find-PopupElement $w ([Windows.Automation.ControlType]::Edit) (Ui 'Group name' 'Nome del gruppo'); $null -ne $script:box } 4000
     $value = if ($ok) { $script:box.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value } else { '' }
     Check '"Rinomina…": riquadro con il nome attuale' ($ok -and $value -eq 'xpxA') "valore '$value'"
     if ($ok) {
         $script:box.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('xpxR')
-        $save = Find-PopupElement $w ([Windows.Automation.ControlType]::Button) 'Salva'
+        $save = Find-PopupElement $w ([Windows.Automation.ControlType]::Button) (Ui 'Save' 'Salva')
         if ($save) { Invoke-Element $save }
     }
     Start-Sleep -Milliseconds 800
     $d = Get-GroupDump $w
     Check '  "Salva": gruppo rinominato (nella barra e nel file)' ($d.Groups.ContainsKey('xpxR') -and -not $d.Groups.ContainsKey('xpxA') -and (Find-BarButton $w 'xpxR') -and (Get-Content -LiteralPath $groupsFile -Raw -Encoding UTF8) -match '"xpxR"') (Format-Dump $d)
-    Check '  il riquadro si chiude' (Wait-Until { -not (Find-PopupElement $w ([Windows.Automation.ControlType]::Edit) 'Nome del gruppo') } 3000)
+    Check '  il riquadro si chiude' (Wait-Until { -not (Find-PopupElement $w ([Windows.Automation.ControlType]::Edit) (Ui 'Group name' 'Nome del gruppo')) } 3000)
     # Annulla: il nome resta
     Send-Group $w 'edit xpxR'
-    $ok = Wait-Until { $script:box = Find-PopupElement $w ([Windows.Automation.ControlType]::Edit) 'Nome del gruppo'; $null -ne $script:box } 4000
+    $ok = Wait-Until { $script:box = Find-PopupElement $w ([Windows.Automation.ControlType]::Edit) (Ui 'Group name' 'Nome del gruppo'); $null -ne $script:box } 4000
     if ($ok) {
         $script:box.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('xpxNO')
-        $cancel = Find-PopupElement $w ([Windows.Automation.ControlType]::Button) 'Annulla'
+        $cancel = Find-PopupElement $w ([Windows.Automation.ControlType]::Button) (Ui 'Cancel' 'Annulla')
         if ($cancel) { Invoke-Element $cancel }
     }
     Start-Sleep -Milliseconds 800
@@ -489,32 +489,32 @@ try {
     # Clic destro sullo sfondo della barra: "Nuovo gruppo…", poi il nome
     Send-Group $w 'barmenu'
     $script:newItem = $null
-    if (Wait-Until { $script:newItem = Get-MenuItems $w | Where-Object { $_.Name -eq "Nuovo gruppo$([char]0x2026)" } | Select-Object -First 1; $null -ne $script:newItem } 3000) { Invoke-Element $script:newItem.Element }
-    $ok = Wait-Until { $script:box = Find-PopupElement $w ([Windows.Automation.ControlType]::Edit) 'Nome del gruppo'; $null -ne $script:box } 4000
+    if (Wait-Until { $script:newItem = Get-MenuItems $w | Where-Object { $_.Name -eq "$(Ui 'New group' 'Nuovo gruppo')$([char]0x2026)" } | Select-Object -First 1; $null -ne $script:newItem } 3000) { Invoke-Element $script:newItem.Element }
+    $ok = Wait-Until { $script:box = Find-PopupElement $w ([Windows.Automation.ControlType]::Edit) (Ui 'Group name' 'Nome del gruppo'); $null -ne $script:box } 4000
     $value = if ($ok) { $script:box.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).Current.Value } else { '' }
     $d = Get-GroupDump $w
-    Check 'clic destro sullo sfondo della barra, "Nuovo gruppo…": gruppo creato in fondo, riquadro del nome aperto' ($ok -and $value -eq 'Nuovo gruppo' -and $d.Top -like '*,g:Nuovo gruppo') "valore '$value'; $(Format-Dump $d)"
+    Check 'clic destro sullo sfondo della barra, "Nuovo gruppo…": gruppo creato in fondo, riquadro del nome aperto' ($ok -and $value -eq (Ui 'New group' 'Nuovo gruppo') -and $d.Top -like ('*,g:' + (Ui 'New group' 'Nuovo gruppo'))) "valore '$value'; $(Format-Dump $d)"
     if ($ok) {
         $script:box.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue('xpxC')
-        $save = Find-PopupElement $w ([Windows.Automation.ControlType]::Button) 'Salva'
+        $save = Find-PopupElement $w ([Windows.Automation.ControlType]::Button) (Ui 'Save' 'Salva')
         if ($save) { Invoke-Element $save }
     }
     Start-Sleep -Milliseconds 800
     $d = Get-GroupDump $w
-    Check '  col nome scelto' ($d.Groups.ContainsKey('xpxC') -and -not $d.Groups.ContainsKey('Nuovo gruppo')) (Format-Dump $d)
+    Check '  col nome scelto' ($d.Groups.ContainsKey('xpxC') -and -not $d.Groups.ContainsKey((Ui 'New group' 'Nuovo gruppo'))) (Format-Dump $d)
 
     "--- menu di una cartella: Sposta nel gruppo, Togli dal gruppo"
     Send-Group $w 'classic f:xpx-pin-4'
     $menus = @(Wait-ClassicMenu)
     $items = if ($menus.Count -gt 0) { @(Read-ClassicMenu $menus[0]) } else { @() }
-    $pos = [array]::IndexOf($items, 'Sposta nel gruppo')
+    $pos = [array]::IndexOf($items, (Ui 'Move to group' 'Sposta nel gruppo'))
     $sub = @()
     if ($pos -ge 0) {
         $subWindow = Open-ClassicSubmenu $menus[0] $pos
         if ($subWindow) { $sub = @(Read-ClassicMenu $subWindow) }
     }
-    $expectedSub = "xpxR|xpxR $([char]0x203A) xpxB|xpxE|xpxC||Nuovo gruppo$([char]0x2026)"
-    Check 'menu classico di una cartella di primo livello: "Sposta nel gruppo" con tutti i gruppi (annidati col percorso), senza "Togli dal gruppo"' ($pos -ge 0 -and $items -notcontains 'Togli dal gruppo' -and ($sub -join '|') -eq $expectedSub) "voce al posto $pos su $($items.Count); sottomenu: $($sub -join ' | ')"
+    $expectedSub = "xpxR|xpxR $([char]0x203A) xpxB|xpxE|xpxC||$(Ui 'New group' 'Nuovo gruppo')$([char]0x2026)"
+    Check 'menu classico di una cartella di primo livello: "Sposta nel gruppo" con tutti i gruppi (annidati col percorso), senza "Togli dal gruppo"' ($pos -ge 0 -and $items -notcontains (Ui 'Remove from group' 'Togli dal gruppo') -and ($sub -join '|') -eq $expectedSub) "voce al posto $pos su $($items.Count); sottomenu: $($sub -join ' | ')"
     $k = [array]::IndexOf($sub, 'xpxC')
     if ($subWindow -and $k -ge 0) { Select-ClassicItem $subWindow $k } else { Close-ClassicMenus }
     Wait-Until { [NavKit]::Menus([uint32]$sepPid).Count -eq 0 } 3000 | Out-Null
@@ -524,7 +524,7 @@ try {
     Send-Group $w 'classic f:xpx-pin-4'
     $menus = @(Wait-ClassicMenu)
     $items = if ($menus.Count -gt 0) { @(Read-ClassicMenu $menus[0]) } else { @() }
-    $pos = [array]::IndexOf($items, 'Togli dal gruppo')
+    $pos = [array]::IndexOf($items, (Ui 'Remove from group' 'Togli dal gruppo'))
     if ($pos -ge 0) { Select-ClassicItem $menus[0] $pos } else { Close-ClassicMenus }
     Wait-Until { [NavKit]::Menus([uint32]$sepPid).Count -eq 0 } 3000 | Out-Null
     Start-Sleep -Milliseconds 600
@@ -537,8 +537,8 @@ try {
     if (Wait-Until { $script:more = Find-MenuItemById $w 'expandtoclassic'; $null -ne $script:more } 4000) { Invoke-Element $script:more }
     $menus = @(Wait-ClassicMenu)
     $items = if ($menus.Count -gt 0) { @(Read-ClassicMenu $menus[0]) } else { @() }
-    $pos = [array]::IndexOf($items, 'Togli dal gruppo')
-    Check 'menu nuovo di una cartella in un gruppo, "Mostra altre opzioni": "Sposta nel gruppo" e "Togli dal gruppo"' ($null -ne $script:more -and $items -contains 'Sposta nel gruppo' -and $pos -ge 0) "$($items.Count) voci"
+    $pos = [array]::IndexOf($items, (Ui 'Remove from group' 'Togli dal gruppo'))
+    Check 'menu nuovo di una cartella in un gruppo, "Mostra altre opzioni": "Sposta nel gruppo" e "Togli dal gruppo"' ($null -ne $script:more -and $items -contains (Ui 'Move to group' 'Sposta nel gruppo') -and $pos -ge 0) "$($items.Count) voci"
     $orderBefore = Get-WindowsOrder
     if ($pos -ge 0) { Select-ClassicItem $menus[0] $pos } else { Close-ClassicMenus }
     Wait-Until { [NavKit]::Menus([uint32]$sepPid).Count -eq 0 } 3000 | Out-Null
@@ -595,7 +595,7 @@ try {
     Check 'gruppo trascinato fuori dal blocco: torna nel blocco (in testa)' ($d.Top -like 'g:xpxC,*') (Format-Dump $d)
     Send-Group $w 'menu xpxR'
     $script:remove = $null
-    if (Wait-Until { $script:remove = Get-MenuItems $w | Where-Object { $_.Name -eq 'Elimina gruppo' } | Select-Object -First 1; $null -ne $script:remove } 3000) { Invoke-Element $script:remove.Element }
+    if (Wait-Until { $script:remove = Get-MenuItems $w | Where-Object { $_.Name -eq (Ui 'Delete group' 'Elimina gruppo') } | Select-Object -First 1; $null -ne $script:remove } 3000) { Invoke-Element $script:remove.Element }
     Start-Sleep -Milliseconds 1500
     $d = Get-GroupDump $w
     $topPins = Get-TopPins $d
@@ -743,17 +743,17 @@ try {
         [void][NavMouse]::SetForegroundWindow([IntPtr]$w); Start-Sleep -Milliseconds 300
         $bn = Find-BarButton $w 'xpxN'
         if ($bn) { $p = Center $bn; Move-To $p[0] $p[1] 12; Start-Sleep -Milliseconds 150; Mouse-RightClick }
-        $ok = Wait-Until { @(Get-MenuItems $w | Where-Object { $_.Name -like 'Apri tutte (*' }).Count -gt 0 } 3000
+        $ok = Wait-Until { @(Get-MenuItems $w | Where-Object { $_.Name -like ((Ui 'Open all' 'Apri tutte') + ' (*') }).Count -gt 0 } 3000
         $names = @(Get-MenuItems $w | ForEach-Object { $_.Name })
         if ($ok) { Press-Escape }
-        Check 'mouse: clic destro sul gruppo, il suo menu; Esc lo chiude' ($ok -and ($names -contains "Rinomina$([char]0x2026)") -and (Wait-Until { @(Get-MenuItems $w).Count -eq 0 } 3000)) ($names -join ' | ')
+        Check 'mouse: clic destro sul gruppo, il suo menu; Esc lo chiude' ($ok -and ($names -contains "$(Ui 'Rename' 'Rinomina')$([char]0x2026)") -and (Wait-Until { @(Get-MenuItems $w).Count -eq 0 } 3000)) ($names -join ' | ')
         # 11) Il nome scritto con la tastiera nel riquadro: tutto selezionato, lettere, Backspace, Invio (Backspace e Invio
         #     non devono arrivare a Esplora file: la scheda non torna indietro)
         [void][NavMouse]::SetForegroundWindow([IntPtr]$w); Start-Sleep -Milliseconds 300
         $pathsBefore = (Get-ActivePath $w).Paths -join '|'
         Send-Group $w 'edit xpxN'
         $script:focus = ''
-        $ok = Wait-Until { $script:focus = Get-FocusedName; $script:focus -like '*|Nome del gruppo' } 3000
+        $ok = Wait-Until { $script:focus = Get-FocusedName; $script:focus -like ('*|' + (Ui 'Group name' 'Nome del gruppo')) } 3000
         if ($ok) { Type-Text 'xpxkq'; Send-Key 0x08; Send-Key 0x0D }
         Start-Sleep -Milliseconds 1000
         $d = Get-GroupDump $w

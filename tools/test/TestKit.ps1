@@ -15,6 +15,11 @@ Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 $XAE = [Windows.Automation.AutomationElement]
 $XTS = [Windows.Automation.TreeScope]
 
+# I testi dell'interfaccia (della mod e di Windows) sono nella lingua di Windows, come Tr() nella mod: le prove li
+# cercano con Ui 'inglese' 'italiano'.
+$XpxItalianUi = [Globalization.CultureInfo]::CurrentUICulture.TwoLetterISOLanguageName -eq 'it'
+function Ui([string]$English, [string]$Italian) { if ($XpxItalianUi) { $Italian } else { $English } }
+
 $XpxRepo = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $XpxExe = Join-Path $XpxRepo 'build\bin\VTabsExplorer.exe'
 $XpxData = Join-Path $env:LOCALAPPDATA 'VTabsExplorer'

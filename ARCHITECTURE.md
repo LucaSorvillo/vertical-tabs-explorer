@@ -92,6 +92,13 @@ replaces two slots in vtables shared by all instances of a class (public WinRT i
   always `DROPEFFECT_LINK` (or `COPY`), never `MOVE`, so the source never moves the folder. `IDropTargetHelper`
   keeps Windows' drag image, with a `CFSTR_DROPDESCRIPTION` text. New folders are pinned with `PinItem` before
   the next pinned folder (`NavItems::PinFolders`), then placed like a bar drag once the next reading includes them.
+  Apps that only offer paths (`CF_HDROP`) work too. Stopping on a group (or on "»") opens its list, as in a bar
+  drag. While the list is open, its popup window (`Microsoft.UI.Content.PopupWindowSiteBridge`, owned by the main
+  window) gets the same drop target. Going from the bar into a list, Windows sends `DragLeave` and then
+  `DragEnter`, and the drag goes on. From another thread or process the data object arrives as a different COM
+  object each time, so a `DragEnter` right after a `DragLeave` counts as the same drag. The drag ends 200 ms after
+  it leaves the bar and the lists, unless the pointer stays right next to them with the button down. The lists
+  close then, and after a drop.
 - `NavGroups`: one store per process, immutable versioned snapshots, saved to `navbar-groups.json`.
 - `ModernMenu`: the Windows 11 context menu, opened the way the navigation pane opens it, through the
   "File Explorer Context Menu" presenter of `Windows.UI.FileExplorer.dll`. These interfaces are undocumented

@@ -23,7 +23,8 @@ namespace xpx::mod
     // lo toglie: lo si fa uscendo dalla barra e al rilascio, come chiede Windows a chi lo mette.
     void SetDropDescription(IDataObject* data, DROPIMAGETYPE type, std::wstring const& message, std::wstring const& insert);
 
-    // Bersaglio OLE (RegisterDragDrop) dell'isola della barra: passa tutto alla barra, che può non esserci più, e tiene
-    // l'immagine del trascinamento di Windows anche sopra di lei (IDropTargetHelper). Sul thread UI della finestra.
+    // Bersaglio OLE (RegisterDragDrop) dell'isola della barra, e della finestra di ogni elenco aperto durante un trascinamento
+    // da fuori: passa tutto alla barra, che può non esserci più, e tiene l'immagine del trascinamento di Windows anche sopra
+    // di lei (IDropTargetHelper, per la finestra hwnd). Sul thread UI della finestra.
     winrt::com_ptr<IDropTarget> MakeNavDropTarget(std::weak_ptr<NavBar> bar, HWND hwnd);
 }

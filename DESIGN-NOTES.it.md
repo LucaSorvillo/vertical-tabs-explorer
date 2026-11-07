@@ -533,11 +533,25 @@ facoltativa e protetta (vedi "Sicurezza della mod").
     Chrome:
     - l'isola della barra ha un bersaglio OLE (`RegisterDragDrop`; il ponte dell'isola di WinUI non ne aveva
       uno suo). Il trascinamento XAML non arriva alle isole aggiunte da noi, un bersaglio OLE sì;
-    - dall'oggetto trascinato (`SHCreateShellItemArrayFromDataObject`) valgono solo le cartelle: `SFGAO_FOLDER`
-      senza `SFGAO_STREAM`, quindi niente file né archivi .zip;
+    - dall'oggetto trascinato (`SHCreateShellItemArrayFromDataObject`; dalla 1.4.0, se non ne esce niente, i
+      percorsi di `CF_HDROP`, l'unico formato di molti programmi che non sono la shell) valgono solo le
+      cartelle: `SFGAO_FOLDER` senza `SFGAO_STREAM`, quindi niente file né archivi .zip;
     - il bersaglio è quello del trascinamento interno (`HitTestScreen`, `ShowTarget`): la linea nel blocco
-      delle cartelle aggiunte, il gruppo evidenziato sul suo quarto centrale. Gli elenchi non si aprono,
-      perché sono finestre a parte senza bersaglio;
+      delle cartelle aggiunte, il gruppo evidenziato sul suo quarto centrale;
+    - **elenchi** (dalla 1.4.0): fermi su un gruppo o su "»" il suo elenco si apre come trascinando dalla barra
+      (`OpenHoveredLevel`, dal timer di 16 ms del trascinamento; `OnSwitchTimer` intanto non cambia elenco). La
+      finestra di ogni elenco aperto (`Microsoft.UI.Content.PopupWindowSiteBridge`, di proprietà della finestra
+      principale, senza un bersaglio suo) riceve lo stesso bersaglio OLE finché l'elenco è aperto
+      (`AttachLevelDropTargets`: la finestra visibile del nostro thread sul centro dell'elenco, grande come
+      lui; tolto in `OnLevelClosed`). Passando dalla barra a un elenco (o tra due elenchi) Windows dà
+      `DragLeave` e subito `DragEnter`: il trascinamento continua. Da un altro thread o processo l'oggetto
+      dati arriva ogni volta come un oggetto COM diverso (provato: il confronto di identità fallisce), quindi
+      conta l'ordine: un'entrata dopo un'uscita è lo stesso trascinamento (Windows ne fa uno alla volta) e si
+      prende l'oggetto nuovo. Fuori da barra ed elenchi il trascinamento finisce dopo 200 ms, e gli elenchi si
+      chiudono, a meno che il puntatore resti lì accanto (16 DIP) col tasto premuto: lo spazio tra la barra
+      e un elenco è di Esplora file. Al rilascio gli elenchi si chiudono subito dopo la chiamata OLE (il
+      rilascio può arrivare proprio al bersaglio della finestra che si chiude). Durante il trascinamento la
+      barra non si ricostruisce, come per quello interno;
     - l'effetto è `DROPEFFECT_LINK` (o `COPY` se la sorgente non ammette il collegamento), mai `MOVE`:
       Esplora file sposterebbe la cartella;
     - l'immagine del trascinamento di Windows resta anche sopra la barra (`IDropTargetHelper`). Accanto c'è
@@ -1476,6 +1490,21 @@ dell'utente sono identiche dopo la prova (impronta). In modalità dimostrativa l
 cartella già aggiunta spostata al primo livello lascia i gruppi ancorati alle cartelle di prima, come il
 trascinamento dalla barra. Fuori dalla modalità dimostrativa l'ordine di Windows segue.
 
+**Elenchi aperti trascinando da fuori** (2026-11-07, 1.4.0): stessa finestra dimostrativa, mouse vero:
+- fermi su Personal l'elenco si apre; lasciata tra due righe: aggiunta lì, nel gruppo;
+- fermi su Work e poi sulla riga del sottogruppo Clients: si apre il sottoelenco; lasciata in fondo: in Clients;
+- Work, poi Personal: si apre il suo al posto di quello di Work; trascinando via da barra ed elenchi si
+  chiudono; annullato con Esc: nulla aggiunto;
+- una cartella già aggiunta lasciata in cima all'elenco di un gruppo: spostata lì;
+- finestra stretta, fermi su "»": l'elenco si apre; lasciata in fondo: al primo livello;
+- da un altro processo (una finestrina WinForms che dà solo `CF_HDROP`): l'elenco si apre, il trascinamento
+  continua dentro l'elenco (un solo inizio nel registro), aggiunta lì con l'effetto "collegamento"; tornando
+  sulla sorgente l'elenco si chiude e il rilascio lì non aggiunge nulla.
+
+Dopo ogni rilascio gli elenchi si chiudono, e ogni finestra di elenco aperta riceve il bersaglio (0x00000000, senza
+sostituirne uno). Attenzione nelle prove: le chiavi delle cartelle tolte da Accesso rapido restano nei gruppi
+(nascoste), quindi una prova ripetuta trova la cartella già al suo posto; per una prova pulita si rifà la demo.
+
 Limiti delle schede verticali: trascinare un file sopra una riga per spostarlo in quella scheda non
 funziona (il trascinamento XAML non raggiunge un'isola XAML aggiunta da noi, come in VTabsNotepad; un
 bersaglio OLE registrato sull'isola sì, lo usa la barra delle cartelle dalla 1.3.0, ma per le righe non c'è); una
@@ -1507,5 +1536,10 @@ visualizzazione di Windows è l'italiano, altrimenti inglese (cambiarla richiede
 `Tr(inglese, italiano)` sceglie il testo. Il markup XAML resta scritto in italiano: in inglese i valori degli
 attributi per l'utente si sostituiscono prima di `XamlReader::Load`. I log restano in italiano. L'installazione
 sceglie la lingua allo stesso modo (Inno Setup, `ShowLanguageDialog=no`).
+
+Le prove cercano i testi dell'interfaccia (della mod e di Windows: menu, riquadro del nome, "Altre cartelle",
+"Questo PC") con `Ui 'inglese' 'italiano'` del TestKit, che segue la lingua di Windows come `Tr()`. Le righe del
+registro che le prove leggono sono sempre in italiano. Dalla 1.4.0 `Test-NavGroups.ps1` passa anche con Windows in
+inglese; le altre prove di Esplora file possono avere ancora qualche nome italiano.
 
 Non affiliato a Microsoft.

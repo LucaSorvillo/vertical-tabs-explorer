@@ -54,6 +54,12 @@ namespace xpx::mod
         // Cartella trascinata da fuori e aggiunta ad Accesso rapido: entro questo tempo la lettura nuova la porta nella barra,
         // che la mette nel posto scelto; poi si rinuncia (aggiunta non riuscita, o cartella fuori dalla modalità dimostrativa).
         constexpr ULONGLONG kPendingDropMs = 15'000;
+        // Trascinamento da fuori uscito da barra ed elenchi: finito se entro questo tempo non rientra (dalla barra a un elenco
+        // Windows dà un'uscita e subito un'entrata), o finché resta lì accanto col tasto premuto (kNearDip).
+        constexpr ULONGLONG kExternalLeaveMs = 200;
+        constexpr int kNearDip = 16;
+        // La finestra a comparsa di WinUI (Windows App SDK) che mostra un flyout fuori dall'isola: quella di un elenco aperto.
+        constexpr wchar_t kPopupWindowClass[] = L"Microsoft.UI.Content.PopupWindowSiteBridge";
         // Icona dei gruppi: due cartelle sovrapposte, solo contorno (16x16, tratto di 1 DIP), come le icone della
         // barra dei comandi: la cartella davanti intera, di quella dietro solo la parte che si vede.
         constexpr wchar_t kGroupIconData[] =
@@ -635,6 +641,10 @@ namespace xpx::mod
             m_menuContext = nullptr;
         }
         Guard(L"chiusura degli elenchi", [&] {
+            for (auto const& level : m_levels)
+            {
+                DetachLevelDropTarget(*level);
+            }
             CloseLevels(0);
             if (m_nameEditor)
             {
@@ -703,11 +713,12 @@ namespace xpx::mod
             m_iconPixels = pixels;
             NavItems::Instance().UseIconSize(pixels);
         }
-        // Voci o gruppi nuovi: non a metà di un trascinamento (la voce trascinata deve restare dov'è).
+        // Voci o gruppi nuovi: non a metà di un trascinamento (la voce trascinata deve restare dov'è; da fuori, la linea e
+        // gli elenchi aperti).
         const auto latest = NavItems::Instance().Latest();
         const auto groups = NavGroups::Instance().Latest();
         const bool newItems = latest && (!m_snapshot || latest->version != m_snapshot->version);
-        if ((newItems || groups != m_groups) && !m_drag.armed)
+        if ((newItems || groups != m_groups) && !m_drag.armed && !m_external.active)
         {
             if (newItems)
             {
@@ -1200,7 +1211,7 @@ namespace xpx::mod
         m_overflow.Visibility(visible < m_entries.size() ? mux::Visibility::Visible : mux::Visibility::Collapsed);
         m_visibleCount = visible;
         // Elenchi aperti da voci che ora sono nascoste (o nell'elenco "»" che è cambiato): si chiudono o si aggiornano.
-        if (changed && !m_levels.empty() && !m_drag.armed)
+        if (changed && !m_levels.empty() && !m_drag.armed && !m_external.active)
         {
             RefreshLevels(true);
         }
@@ -1322,7 +1333,8 @@ namespace xpx::mod
 
     void NavBar::OnSwitchTimer()
     {
-        if (m_levels.empty() || m_drag.armed || !m_hwnd)
+        // (Trascinando, dalla barra o da fuori, un altro gruppo si apre restando fermi su di lui: OpenHoveredLevel.)
+        if (m_levels.empty() || m_drag.armed || m_external.active || !m_hwnd)
         {
             if (m_levels.empty() && m_switchTimer)
             {
@@ -1464,6 +1476,7 @@ namespace xpx::mod
     void NavBar::OnLevelClosed(std::shared_ptr<Level> const& level)
     {
         level->open = false;
+        DetachLevelDropTarget(*level);
         SetOpenHighlight(level, false);
         try
         {
@@ -2975,6 +2988,11 @@ namespace xpx::mod
 
     void NavBar::OnDragTimer()
     {
+        if (m_external.active)
+        {
+            OnExternalTick();
+            return;
+        }
         if (!m_drag.active)
         {
             return;
@@ -3017,6 +3035,11 @@ namespace xpx::mod
                 return;
             }
         }
+        OpenHoveredLevel();
+    }
+
+    void NavBar::OpenHoveredLevel()
+    {
         // Fermi su un gruppo (o su "»"): si apre il suo elenco. Se è della profondità dell'elenco da cui parte la voce, o
         // meno profondo, quell'elenco si chiude (uno per profondità): il trascinamento prima si stacca da lui (come
         // Chrome: dall'elenco di un gruppo a un altro gruppo, per lasciarla dove si vuole nel suo elenco).
@@ -3513,11 +3536,48 @@ namespace xpx::mod
     // segna il posto (al primo livello solo nel blocco delle cartelle aggiunte), il gruppo sotto il puntatore si evidenzia
     // se la cartella ci andrà dentro, e accanto all'immagine del trascinamento compare "Aggiungi ad Accesso rapido" (o
     // "Aggiungi a <gruppo>"). Al rilascio la cartella si aggiunge ad Accesso rapido in quel posto; una già aggiunta si
-    // sposta lì. Gli elenchi non si aprono: sono finestre a parte, dove il trascinamento non arriva alla barra.
+    // sposta lì. Fermi su un gruppo (o su "»") il suo elenco si apre come trascinando dalla barra: la finestra dell'elenco
+    // riceve lo stesso bersaglio OLE (AttachLevelDropTargets), e passando dalla barra all'elenco il trascinamento continua.
+    // Al rilascio, o uscendo da barra ed elenchi, gli elenchi si chiudono (come Chrome).
+
+    namespace
+    {
+        // Lo stesso oggetto COM (anche arrivato due volte da un altro processo: stesso proxy).
+        bool SameObject(IUnknown* a, IUnknown* b)
+        {
+            if (!a || !b)
+            {
+                return false;
+            }
+            winrt::com_ptr<IUnknown> first;
+            winrt::com_ptr<IUnknown> second;
+            return SUCCEEDED(a->QueryInterface(IID_PPV_ARGS(first.put()))) && SUCCEEDED(b->QueryInterface(IID_PPV_ARGS(second.put()))) &&
+                   first == second;
+        }
+    }
 
     DWORD NavBar::OnExternalDragEnter(IDataObject* data, POINT screen, DWORD allowed)
     {
-        OnExternalDragLeave();
+        if (m_external.active)
+        {
+            // Dalla barra a un elenco (o viceversa), o di nuovo dentro subito dopo: lo stesso trascinamento continua (Windows ne
+            // fa uno alla volta, e l'entrata arriva subito dopo l'uscita). Da un altro thread o processo l'oggetto dati arriva
+            // ogni volta come un oggetto COM diverso: si prende quello nuovo (descrizione e cartelle sono sue).
+            const bool same = SameObject(m_external.data.get(), data);
+            if (same || m_external.leftAt)
+            {
+                if (!same)
+                {
+                    m_external.data.copy_from(data);
+                    m_external.described.clear();
+                    m_external.folders = FoldersOf(data);
+                    m_drag.key = m_external.folders.size() == 1 ? m_external.folders.front().key : std::wstring{};
+                }
+                m_external.leftAt = 0;
+                return OnExternalDragOver(screen, allowed);
+            }
+            EndExternalDrag(); // un'entrata senza uscita, con un altro oggetto: un altro trascinamento
+        }
         if (!m_root || m_drag.armed || m_menuOpen)
         {
             return DROPEFFECT_NONE; // un trascinamento della barra, o un menu modale, in corso
@@ -3525,12 +3585,15 @@ namespace xpx::mod
         m_external.active = true;
         m_external.folders = FoldersOf(data);
         m_external.data.copy_from(data);
-        CloseLevels(0);
         m_drag = {};
         // Una sola cartella già nella barra: lasciata accanto a sé stessa non si sposta (come trascinandola dalla barra).
         if (m_external.folders.size() == 1)
         {
             m_drag.key = m_external.folders.front().key;
+        }
+        if (m_dragTimer)
+        {
+            m_dragTimer.Start(); // OnExternalTick
         }
         XPX_MLOG(L"NavBar: trascinamento da fuori sopra la barra (%zu %s).", m_external.folders.size(),
                  m_external.folders.size() == 1 ? L"cartella" : L"cartelle");
@@ -3543,13 +3606,8 @@ namespace xpx::mod
         {
             return DROPEFFECT_NONE;
         }
-        DropTarget target = HitTestScreen(screen);
-        if (target.level >= 0)
-        {
-            target = {}; // (con gli elenchi chiusi non succede: solo la barra)
-        }
-        target.hover = nullptr; // da fuori gli elenchi non si aprono
-        target.hoverAnchor = nullptr;
+        m_external.leftAt = 0; // (arriva solo dal bersaglio sotto il puntatore: la barra o un elenco)
+        const DropTarget target = HitTestScreen(screen);
         ShowTarget(target);
         const DWORD effect = ExternalEffect(target, allowed);
         DescribeExternal(target, effect);
@@ -3562,25 +3620,27 @@ namespace xpx::mod
         {
             return;
         }
+        // Forse verso un elenco (o dall'elenco alla barra): lì arriva subito l'entrata, e il trascinamento continua. Se no,
+        // finisce tra poco (OnExternalTick). Intanto niente linea né descrizione.
         if (!m_external.described.empty())
         {
             SetDropDescription(m_external.data.get(), DROPIMAGE_INVALID, {}, {});
+            m_external.described.clear();
         }
-        ClearTargetVisuals(m_drag.target);
-        m_drag = {};
-        m_external = {};
+        ShowTarget(DropTarget{});
+        m_external.leftAt = GetTickCount64();
     }
 
     DWORD NavBar::OnExternalDrop(IDataObject* data, POINT screen, DWORD allowed)
     {
-        if (!m_external.active)
+        if (!m_external.active || m_external.leftAt)
         {
-            OnExternalDragEnter(data, screen, allowed); // (rilascio senza ingresso: per sicurezza si rifà tutto)
+            OnExternalDragEnter(data, screen, allowed); // (rilascio senza ingresso: per sicurezza)
         }
         const DWORD effect = OnExternalDragOver(screen, allowed);
         const DropTarget target = m_drag.target;
         const std::vector<DroppedFolder> folders = m_external.folders;
-        OnExternalDragLeave(); // linea, evidenziazione e descrizione via
+        EndExternalDrag(); // linea, evidenziazione e descrizione via; gli elenchi si chiudono
         if (effect == DROPEFFECT_NONE || !target.valid || folders.empty())
         {
             XPX_MLOG(L"NavBar: trascinamento da fuori lasciato fuori posto, o senza cartelle: nulla aggiunto.");
@@ -3610,7 +3670,8 @@ namespace xpx::mod
         std::wstring group;
         if (effect != DROPEFFECT_NONE)
         {
-            if (target.into)
+            // Sul gruppo o nel suo elenco: "Aggiungi a <gruppo>"; nella barra o nell'elenco "»": "Aggiungi ad Accesso rapido".
+            if (!target.container.empty())
             {
                 const NavGroup* found = m_groups ? m_groups->Find(target.container) : nullptr;
                 group = found ? found->name : std::wstring{};
@@ -3632,7 +3693,7 @@ namespace xpx::mod
         {
             SetDropDescription(m_external.data.get(), DROPIMAGE_INVALID, {}, {});
         }
-        else if (target.into)
+        else if (!target.container.empty())
         {
             SetDropDescription(m_external.data.get(), image, Tr(L"Add to %1", L"Aggiungi a %1"), group);
         }
@@ -3716,6 +3777,225 @@ namespace xpx::mod
                 XPX_MLOG(L"NavBar: cartella trascinata da fuori non comparsa in Accesso rapido entro %llu s.", kPendingDropMs / 1000);
             }
         }
+    }
+
+    void NavBar::OnExternalTick()
+    {
+        if (m_external.leftAt)
+        {
+            // Uscito da barra ed elenchi: finito se non rientra subito, a meno che resti lì accanto col tasto premuto (lo spazio
+            // tra la barra e un elenco è di Esplora file). Esc, o il tasto lasciato, lo chiudono comunque.
+            const bool down = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 || (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0 ||
+                              (GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0;
+            const bool escape = (GetAsyncKeyState(VK_ESCAPE) & 0x8000) != 0;
+            POINT cursor{};
+            const bool nearby = down && !escape && GetCursorPos(&cursor) && NearBarOrLevels(cursor);
+            if (GetTickCount64() - m_external.leftAt >= kExternalLeaveMs && !nearby)
+            {
+                XPX_MLOG(L"NavBar: trascinamento da fuori uscito dalla barra%s.", m_levels.empty() ? L"" : L" e dagli elenchi, che si chiudono");
+                EndExternalDrag();
+            }
+            return;
+        }
+        AttachLevelDropTargets();
+        OpenHoveredLevel();
+    }
+
+    void NavBar::EndExternalDrag()
+    {
+        if (!m_external.active)
+        {
+            return;
+        }
+        if (!m_external.described.empty())
+        {
+            SetDropDescription(m_external.data.get(), DROPIMAGE_INVALID, {}, {});
+        }
+        ClearTargetVisuals(m_drag.target);
+        m_drag = {};
+        m_external = {};
+        if (m_dragTimer)
+        {
+            m_dragTimer.Stop();
+        }
+        if (m_levels.empty())
+        {
+            return;
+        }
+        // Gli elenchi aperti passandoci sopra si chiudono, come in Chrome. Dopo la chiamata OLE in corso: il rilascio può
+        // arrivare proprio al bersaglio della finestra di un elenco, che chiudendolo si toglie.
+        const std::weak_ptr<NavBar> weak = weak_from_this();
+        bool queued = false;
+        try
+        {
+            queued = m_root && m_root.DispatcherQueue().TryEnqueue([weak] {
+                if (const auto self = weak.lock(); self && !self->m_external.active && !self->m_drag.armed)
+                {
+                    Guard(L"chiusura degli elenchi", [&] { self->CloseLevels(0); });
+                }
+            });
+        }
+        catch (...)
+        {
+        }
+        if (!queued)
+        {
+            CloseLevels(0);
+        }
+    }
+
+    void NavBar::AttachLevelDropTargets()
+    {
+        for (auto const& level : m_levels)
+        {
+            if (!level->open || level->dropWindow)
+            {
+                continue;
+            }
+            const HWND popup = FindLevelWindow(*level);
+            if (!popup)
+            {
+                continue; // (non ancora visibile: al prossimo giro)
+            }
+            const auto target = MakeNavDropTarget(weak_from_this(), popup);
+            HRESULT result = target ? RegisterDragDrop(popup, target.get()) : E_OUTOFMEMORY;
+            bool replaced = false;
+            if (result == DRAGDROP_E_ALREADYREGISTERED)
+            {
+                // Un bersaglio rimasto (di un elenco sparito senza chiudersi) o di WinUI: finché l'elenco è aperto vale il nostro.
+                RevokeDragDrop(popup);
+                result = RegisterDragDrop(popup, target.get());
+                replaced = true;
+            }
+            level->dropWindow = popup;
+            level->dropRegistered = SUCCEEDED(result);
+            XPX_MLOG(L"NavBar: elenco aperto trascinando da fuori, bersaglio sulla sua finestra: 0x%08X%s.", static_cast<unsigned>(result),
+                     replaced ? L" (sostituito quello che aveva)" : L"");
+        }
+    }
+
+    void NavBar::DetachLevelDropTarget(Level& level)
+    {
+        const HWND popup = level.dropWindow;
+        const bool registered = level.dropRegistered;
+        level.dropWindow = nullptr;
+        level.dropRegistered = false;
+        if (!popup || !registered || !IsWindow(popup))
+        {
+            return;
+        }
+        // (La stessa finestra già passata a un altro elenco aperto: il bersaglio ora è suo.)
+        for (auto const& other : m_levels)
+        {
+            if (other.get() != &level && other->dropWindow == popup)
+            {
+                return;
+            }
+        }
+        RevokeDragDrop(popup);
+    }
+
+    HWND NavBar::FindLevelWindow(Level const& level) const
+    {
+        const auto rect = LevelScreenRect(level);
+        if (!rect || !m_main)
+        {
+            return nullptr;
+        }
+        struct Search
+        {
+            HWND main = nullptr;
+            POINT center{};
+            LONG width = 0;
+            LONG height = 0;
+            HWND best = nullptr;
+            LONG bestDistance = LONG_MAX;
+        } search;
+        search.main = m_main;
+        search.center = POINT{ (rect->left + rect->right) / 2, (rect->top + rect->bottom) / 2 };
+        search.width = rect->right - rect->left;
+        search.height = rect->bottom - rect->top;
+        EnumThreadWindows(
+            GetCurrentThreadId(),
+            [](HWND hwnd, LPARAM param) -> BOOL {
+                auto& found = *reinterpret_cast<Search*>(param);
+                RECT window{};
+                if (!IsWindowVisible(hwnd) || (GetWindow(hwnd, GW_OWNER) != found.main && GetAncestor(hwnd, GA_ROOTOWNER) != found.main) ||
+                    !GetWindowRect(hwnd, &window) || !PtInRect(&window, found.center) || interop::ClassOf(hwnd) != kPopupWindowClass)
+                {
+                    return TRUE;
+                }
+                // Tra le finestre a comparsa su quel punto (anche un suggerimento, per esempio), quella grande come l'elenco.
+                const LONG distance = std::abs((window.right - window.left) - found.width) + std::abs((window.bottom - window.top) - found.height);
+                if (distance < found.bestDistance)
+                {
+                    found.bestDistance = distance;
+                    found.best = hwnd;
+                }
+                return TRUE;
+            },
+            reinterpret_cast<LPARAM>(&search));
+        return search.best;
+    }
+
+    std::optional<RECT> NavBar::LevelScreenRect(Level const& level) const
+    {
+        RECT island{};
+        if (!level.open || !level.scroll || !m_root || !m_hwnd || !m_main || !GetWindowRect(m_hwnd, &island))
+        {
+            return std::nullopt;
+        }
+        try
+        {
+            // Le posizioni negli elenchi WinUI le dà nelle coordinate della radice della barra (come per HitTestScreen).
+            const double scale = GetDpiForWindow(m_main) / 96.0;
+            const auto origin = level.scroll.TransformToVisual(m_root).TransformPoint({ 0, 0 });
+            RECT rect{};
+            rect.left = island.left + static_cast<LONG>(std::lround(origin.X * scale));
+            rect.top = island.top + static_cast<LONG>(std::lround(origin.Y * scale));
+            rect.right = rect.left + static_cast<LONG>(std::lround(level.scroll.ActualWidth() * scale));
+            rect.bottom = rect.top + static_cast<LONG>(std::lround(level.scroll.ActualHeight() * scale));
+            if (rect.right <= rect.left || rect.bottom <= rect.top)
+            {
+                return std::nullopt;
+            }
+            return rect;
+        }
+        catch (...)
+        {
+            return std::nullopt;
+        }
+    }
+
+    bool NavBar::NearBarOrLevels(POINT screen) const
+    {
+        if (!m_main)
+        {
+            return false;
+        }
+        const int margin = MulDiv(kNearDip, static_cast<int>(GetDpiForWindow(m_main)), 96);
+        const auto around = [&](RECT rect) {
+            InflateRect(&rect, margin, margin);
+            return PtInRect(&rect, screen) != FALSE;
+        };
+        RECT bar{};
+        if (m_hwnd && IsWindowVisible(m_hwnd) && GetWindowRect(m_hwnd, &bar) && around(bar))
+        {
+            return true;
+        }
+        for (auto const& level : m_levels)
+        {
+            RECT window{};
+            if (level->dropWindow && IsWindow(level->dropWindow) && GetWindowRect(level->dropWindow, &window) && around(window))
+            {
+                return true;
+            }
+            if (const auto rect = LevelScreenRect(*level); rect && around(*rect))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     // --- Menu e geometria ------------------------------------------------------------------------------------

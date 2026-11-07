@@ -70,9 +70,10 @@ Chrome. Funziona con o senza le schede verticali.
   riquadro di spostamento, la Home e il menu dell'icona sulla barra delle applicazioni.
 - **Trascina una cartella da Esplora file** (o dal desktop, o da un altro programma) **sulla barra** per
   aggiungerla ad Accesso rapido proprio lì, come un link lasciato sulla barra dei segnalibri di Chrome.
-  Lasciala al centro di un gruppo per metterla nel gruppo. I file non vengono accettati, e la cartella non
-  viene né spostata né copiata. Windows elenca al massimo 50 cartelle di Accesso rapido, e la barra mostra
-  le stesse.
+  Lasciala al centro di un gruppo per metterla nel gruppo, oppure fermati un attimo sul gruppo: il suo elenco
+  si apre, e la cartella si lascia esattamente dove si vuole, anche in un sottogruppo (lo stesso per
+  l'elenco "»"). I file non vengono accettati, e la cartella non viene né spostata né copiata. Windows
+  elenca al massimo 50 cartelle di Accesso rapido, e la barra mostra le stesse.
 - **Gruppi**: raccolgono cartelle e altri gruppi, uno dentro l'altro senza limiti.
   - Un clic su un gruppo apre il suo elenco. Con un elenco aperto, passando su un altro gruppo si apre subito
     il suo, come in Chrome.
@@ -87,7 +88,8 @@ Chrome. Funziona con o senza le schede verticali.
 | ![Un gruppo con un sottogruppo aperto](docs/assets/explorer-groups.png) | ![Il menu di Windows 11 su una cartella della barra](docs/assets/explorer-context-menu.png) |
 
 **Trascina una cartella su un gruppo** e fermati un attimo: il gruppo si apre, e la cartella si lascia
-esattamente dove si vuole. Vale dalla barra, dall'elenco di un gruppo e da un gruppo all'altro.
+esattamente dove si vuole. Vale dalla barra, dall'elenco di un gruppo, da un gruppo all'altro e per le
+cartelle trascinate da Esplora file.
 
 ![Una cartella trascinata dentro un gruppo](docs/assets/explorer-drag-group.gif)
 

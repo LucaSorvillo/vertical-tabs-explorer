@@ -5,6 +5,7 @@
 #include "NavBar.h"
 #include "NavGroups.h"
 
+#include <shellapi.h>
 #include <shobjidl.h>
 
 namespace xpx::mod
@@ -121,25 +122,87 @@ namespace xpx::mod
         };
     }
 
+    namespace
+    {
+        // Gli elementi come li dà la shell (Esplora file, il desktop: CFSTR_SHELLIDLIST).
+        std::vector<com_ptr<IShellItem>> ShellItemsOf(IDataObject* data)
+        {
+            std::vector<com_ptr<IShellItem>> result;
+            com_ptr<IShellItemArray> items;
+            DWORD count = 0;
+            if (FAILED(SHCreateShellItemArrayFromDataObject(data, IID_PPV_ARGS(items.put()))) || !items || FAILED(items->GetCount(&count)))
+            {
+                return result;
+            }
+            for (DWORD i = 0; i < count && i < kMaxExamined; ++i)
+            {
+                com_ptr<IShellItem> item;
+                if (SUCCEEDED(items->GetItemAt(i, item.put())) && item)
+                {
+                    result.push_back(std::move(item));
+                }
+            }
+            return result;
+        }
+
+        // Altri programmi (un altro gestore di file, un editor...) danno spesso solo i percorsi (CF_HDROP).
+        std::vector<com_ptr<IShellItem>> PathItemsOf(IDataObject* data)
+        {
+            std::vector<com_ptr<IShellItem>> result;
+            FORMATETC format{ CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+            STGMEDIUM medium{};
+            if (FAILED(data->GetData(&format, &medium)))
+            {
+                return result;
+            }
+            if (medium.tymed == TYMED_HGLOBAL && medium.hGlobal)
+            {
+                const auto drop = static_cast<HDROP>(medium.hGlobal);
+                const UINT count = DragQueryFileW(drop, 0xFFFFFFFF, nullptr, 0);
+                for (UINT i = 0; i < count && i < kMaxExamined; ++i)
+                {
+                    const UINT length = DragQueryFileW(drop, i, nullptr, 0);
+                    if (length == 0)
+                    {
+                        continue;
+                    }
+                    std::wstring path(length, L'\0');
+                    if (DragQueryFileW(drop, i, path.data(), length + 1) == 0)
+                    {
+                        continue;
+                    }
+                    com_ptr<IShellItem> item;
+                    if (SUCCEEDED(SHCreateItemFromParsingName(path.c_str(), nullptr, IID_PPV_ARGS(item.put()))) && item)
+                    {
+                        result.push_back(std::move(item));
+                    }
+                }
+            }
+            ReleaseStgMedium(&medium);
+            return result;
+        }
+    }
+
     std::vector<DroppedFolder> FoldersOf(IDataObject* data)
     {
         std::vector<DroppedFolder> result;
-        com_ptr<IShellItemArray> items;
-        if (!data || FAILED(SHCreateShellItemArrayFromDataObject(data, IID_PPV_ARGS(items.put()))) || !items)
+        if (!data)
         {
             return result;
         }
-        DWORD count = 0;
-        if (FAILED(items->GetCount(&count)))
+        auto items = ShellItemsOf(data);
+        if (items.empty())
         {
-            return result;
+            items = PathItemsOf(data);
+            if (!items.empty())
+            {
+                XPX_MLOG(L"NavBar: trascinamento da fuori con i soli percorsi (CF_HDROP): %zu elementi.", items.size());
+            }
         }
-        for (DWORD i = 0; i < count && i < kMaxExamined; ++i)
+        for (auto const& item : items)
         {
-            com_ptr<IShellItem> item;
             SFGAOF attributes = 0;
-            if (FAILED(items->GetItemAt(i, item.put())) || !item || FAILED(item->GetAttributes(SFGAO_FOLDER | SFGAO_STREAM, &attributes)) ||
-                !(attributes & SFGAO_FOLDER) || (attributes & SFGAO_STREAM))
+            if (FAILED(item->GetAttributes(SFGAO_FOLDER | SFGAO_STREAM, &attributes)) || !(attributes & SFGAO_FOLDER) || (attributes & SFGAO_STREAM))
             {
                 continue;
             }
