@@ -185,7 +185,8 @@ Tutto è nel menu della tray (clic destro sull'icona):
 Con Windows in un'altra lingua le voci sono in inglese, come nell'immagine.
 
 Spegnendo le schede verticali o la barra delle cartelle tornano subito la normale barra delle schede e il
-riquadro di spostamento di Esplora file.
+riquadro di spostamento di Esplora file. **Esci** fa lo stesso in tutte le finestre aperte, e le due funzioni
+tornano quando riapri l'app.
 
 L'app accetta anche alcune opzioni da riga di comando: `--restore-now`, `--reopen-tab`, `--exit`.
 
@@ -220,6 +221,8 @@ non caricano nulla dentro Esplora file.
     segnalazione.
   - `runtime\`: una copia del modulo caricato in Esplora file, così l'app si può aggiornare anche con Esplora
     file aperto.
+  - `tray-exited.txt`: c'è solo mentre l'app è chiusa con **Esci**, perché le finestre aperte sappiano di tornare
+    normali.
 
 ## Come funziona
 
@@ -267,8 +270,8 @@ schede verticali lavorano anche in un processo `explorer.exe` separato. Le tue f
 ## Disinstallazione
 
 **Impostazioni** › **App** › **App installate** › **Vertical Tabs for File Explorer** › **Disinstalla**. La
-disinstallazione chiude l'app nella tray e chiede se eliminare anche impostazioni e dati salvati. Le finestre
-già aperte tengono le schede verticali finché Esplora file non si riavvia (o fino alla disconnessione).
+disinstallazione chiude l'app nella tray, quindi le finestre aperte tornano subito alle schede normali di
+Esplora file, e chiede se eliminare anche impostazioni e dati salvati.
 
 ## Limiti
 

@@ -26,7 +26,7 @@ taskbar and the desktop, so the module has extra safety measures.
 
 | File | Role |
 | --- | --- |
-| `main.cpp` | Tray icon and menu, settings, "start with Windows", command line (`--restore-now`, `--reopen-tab`, `--exit`, `--inject-pid <pid>`). |
+| `main.cpp` | Tray icon and menu, settings, "start with Windows", command line (`--restore-now`, `--reopen-tab`, `--exit`, `--exit --keep-mods`, `--inject-pid <pid>`). |
 | `Worker.cpp` | The real work, on its own thread, because calls into File Explorer are cross-process and can be slow. Tracks live windows and saves the session on every change. Restores the session when File Explorer is reopened. Keeps the stack of closed tabs and windows. Moves folders opened by other apps into a tab. |
 | `Explorer.cpp` | Shell COM wrapper: `IShellWindows` / `IWebBrowser2` to read windows and tabs, open a tab (the window's "new tab" command, then `Navigate2`), activate and place windows. |
 | `Session.cpp` | `session.txt` and `closed.txt`: versioned text formats, written atomically. A closed tab keeps the position it had (`window tabs at N`). |
@@ -111,6 +111,11 @@ replaces two slots in vtables shared by all instances of a class (public WinRT i
 - Every event handler toward the XAML runtime is wrapped: no exception leaves the module's code.
 - The module is never unloaded, because its hooks stay installed. Turning a feature off restores File
   Explorer's interface.
+- **Exit** (tray menu or `--exit`, which the installer uses too) leaves `tray-exited.txt` in the data folder
+  after the tray app's last session save. The module watches the folder and treats the vertical tabs and the
+  folders bar as off while the file is there, also for windows opened later, without touching `settings.ini`.
+  The tray app deletes the file when it starts, and the module turns everything back on. A crash or the end of
+  the Windows session doesn't create it. `--exit --keep-mods` (build and test scripts) exits without it.
 - Test mode (`dev-filter.txt`, `dev-windows.txt` in the data folder) restricts the tray app and the module to
   the windows opened by the tests. `mod-command.txt` accepts test commands addressed to one window.
 
@@ -127,7 +132,7 @@ UI language; `ShowLanguageDialog=no`, English first).
 ## Data files
 
 All in `%LOCALAPPDATA%\VTabsExplorer`: `settings.ini`, `session.txt`, `closed.txt`, `navbar-groups.json`,
-`colors\`, `logs\`, `runtime\`. The [README](README.md#privacy) lists what each one contains.
+`colors\`, `logs\`, `runtime\`, and `tray-exited.txt` while the app is closed with Exit. The [README](README.md#privacy) lists what each one contains.
 
 ## Build and tests
 

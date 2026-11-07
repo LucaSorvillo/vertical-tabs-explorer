@@ -32,11 +32,12 @@ if ($Clean -and (Test-Path $buildDir)) { Remove-Item -LiteralPath $buildDir -Rec
 # Proiezioni C++/WinRT per la mod delle schede verticali (dai .winmd del runtime di Esplora file).
 & (Join-Path $root 'tools\Generate-Projections.ps1') -OutDir (Join-Path $buildDir 'generated\cppwinrt')
 
-# La tray in esecuzione blocca l'eseguibile: va chiusa prima di ricollegarlo (e riavviata dopo).
+# La tray in esecuzione blocca l'eseguibile: va chiusa prima di ricollegarlo (e riavviata dopo), lasciando la mod accesa
+# nelle finestre aperte (--keep-mods: "Esci" la spegnerebbe).
 $exe = Join-Path $buildDir 'bin\VTabsExplorer.exe'
 $running = Get-Process VTabsExplorer -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
 if ($running) {
-    & $exe --exit
+    & $exe --exit --keep-mods
     $running | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
 }
 

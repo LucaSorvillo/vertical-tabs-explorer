@@ -535,7 +535,8 @@ function Get-XpxLog([int]$N = 30) {
 function Start-Tray {
     if (-not (Get-Process VTabsExplorer -ErrorAction SilentlyContinue)) { Start-Process -FilePath $XpxExe -WorkingDirectory (Split-Path $XpxExe); Start-Sleep -Seconds 2 }
 }
+# Solo per riavviarla: la mod nelle finestre aperte resta accesa (--keep-mods; "Esci" la spegnerebbe).
 function Stop-Tray {
-    & $XpxExe --exit
+    & $XpxExe --exit --keep-mods
     Wait-Until { -not (Get-Process VTabsExplorer -ErrorAction SilentlyContinue) } 8000 | Out-Null
 }

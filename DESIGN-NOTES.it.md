@@ -740,7 +740,8 @@ Requisiti: Visual Studio con strumenti C++ x64 (CMake e Ninja inclusi), Windows 
 build\bin\VTabsExplorer.exe          # avvia la tray
 build\bin\VTabsExplorer.exe --restore-now   # riapre subito l'ultima sessione
 build\bin\VTabsExplorer.exe --reopen-tab    # riapre l'ultima scheda chiusa (come Ctrl+Maiusc+T)
-build\bin\VTabsExplorer.exe --exit   # chiude la tray
+build\bin\VTabsExplorer.exe --exit   # chiude la tray come "Esci" (la mod si spegne nelle finestre aperte)
+build\bin\VTabsExplorer.exe --exit --keep-mods  # chiude la tray lasciando la mod accesa (build.ps1, Stop-Tray)
 build\bin\VTabsExplorer.exe --inject-pid N  # (sviluppo) mod in un explorer.exe di prova, mai in quello
                                          # della barra delle applicazioni
 ```
@@ -1524,7 +1525,19 @@ qualche millisecondo prima di essere velate.
 
 Dal menu della tray: togliere "Riapri le cartelle all'apertura di Esplora file", oppure "Esci". Le
 schede verticali si spengono dalla loro voce (torna subito la barra orizzontale; la mod resta caricata
-in Esplora file, inattiva, fino al suo riavvio). Per rimuovere tutto: spegnere le schede verticali,
+in Esplora file, inattiva, fino al suo riavvio).
+
+**"Esci" spegne la mod** (dalla 1.4.2; prima restava accesa nelle finestre aperte finché Esplora file non si
+riavviava, segnalato dall'utente il 2026-11-07). Alla fine di wWinMain, dopo l'ultimo salvataggio della sessione (che
+usa i colori pubblicati dalla mod finché è accesa), la tray scrive `tray-exited.txt` nella cartella dei dati.
+`ModSettings::Load` lo vede (la mod osserva la cartella; il file entra anche in `FileStamp`) e mette schede verticali e
+barra delle cartelle spente, senza scrivere niente in settings.ini (la mod vi salva solo larghezza e stato compresso):
+`Apply` le spegne come dal menu, e anche le finestre aperte dopo restano normali. I colori restano in memoria
+(`Disable` non li cancella) e tornano con la colonna. All'avvio la tray cancella il file e la mod si riaccende. Un
+crash della tray o la fine della sessione di Windows non lo scrivono (solo "Esci" e `--exit`, che usano anche gli
+installer: disinstallando, le finestre tornano subito normali; tolto il messaggio "restano fino al riavvio"). Per
+la compilazione e le prove `--exit --keep-mods` esce senza file. Prova: scratchpad `media\xpx-exit-test.ps1` nella
+finestra dimostrativa (spenta in 0,1 s, riaccesa con gli stessi colori, `--keep-mods` accesa). Per rimuovere tutto: spegnere le schede verticali,
 chiudere la tray, riavviare Esplora file, togliere "Avvia con Windows", cancellare
 `%LOCALAPPDATA%\VTabsExplorer` e la cartella del progetto. Su disco Esplora file non viene mai modificato.
 

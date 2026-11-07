@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "ModSettings.h"
 
+#include "../ModShared.h"
 #include "ModLog.h"
 
 namespace xpx::mod
@@ -15,6 +16,11 @@ namespace xpx::mod
         std::wstring DevWindowsFile()
         {
             return DataDirectory() + L"\\dev-windows.txt";
+        }
+
+        std::wstring TrayExitedFile()
+        {
+            return DataDirectory() + L"\\" + kTrayExitedFile;
         }
 
         ULONGLONG WriteTime(std::wstring const& path)
@@ -73,6 +79,13 @@ namespace xpx::mod
         s.navBar = GetPrivateProfileIntW(L"NavBar", L"Enabled", s.navBar ? 1 : 0, file.c_str()) != 0;
         s.verboseLog = GetPrivateProfileIntW(L"Debug", L"VerboseLog", s.verboseLog ? 1 : 0, file.c_str()) != 0;
         s.devAllowlist = ReadDevWindows(s.devWindows);
+        // Tray chiusa con "Esci": tutto spento finché non riparte (qui solo in lettura: il file resta com'è).
+        s.trayExited = GetFileAttributesW(TrayExitedFile().c_str()) != INVALID_FILE_ATTRIBUTES;
+        if (s.trayExited)
+        {
+            s.verticalTabs = false;
+            s.navBar = false;
+        }
         return s;
     }
 
@@ -87,8 +100,9 @@ namespace xpx::mod
 
     ULONGLONG ModSettings::FileStamp()
     {
-        // Somma dei momenti di modifica: cambia se cambia uno dei due file (o se l'elenco compare/sparisce).
-        return WriteTime(SettingsFile()) + WriteTime(DevWindowsFile()) * 3;
+        // Somma dei momenti di modifica: cambia se cambia uno dei file (o se l'elenco o il segnale della tray chiusa
+        // compaiono o spariscono).
+        return WriteTime(SettingsFile()) + WriteTime(DevWindowsFile()) * 3 + WriteTime(TrayExitedFile()) * 5;
     }
 
     bool ModSettings::Allows(HWND window) const

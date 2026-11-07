@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2 — 2026-11-07
+
+- **Exit** in the tray menu now turns the vertical tabs and the folders bar off in the open windows right away
+  (they used to stay until File Explorer restarted). They come back when you start the app again. Uninstalling
+  the app does the same.
+
 ## 1.4.1 — 2026-11-07
 
 - Folders bar: the text next to a folder dragged in from outside is always the classic "Pin to Quick access", also

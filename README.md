@@ -181,7 +181,7 @@ Everything is in the tray menu (right-click the icon):
 | Exit | |
 
 Turning off the vertical tabs or the folders bar brings back File Explorer's normal tab strip and navigation
-pane right away.
+pane right away. **Exit** does the same in every open window, and both come back when you start the app again.
 
 The app also accepts a few command-line options: `--restore-now`, `--reopen-tab`, `--exit`.
 
@@ -215,6 +215,8 @@ load anything into File Explorer.
   - `logs\`: diagnostic logs. They contain folder paths: have a look before sharing them in an issue.
   - `runtime\`: a copy of the module loaded into File Explorer, so the app can be updated while File Explorer
     runs.
+  - `tray-exited.txt`: there only while the app is closed with **Exit**, so the open windows know to go back to
+    normal.
 
 ## How it works
 
@@ -262,8 +264,8 @@ also run in a separate `explorer.exe` process. Your own windows stay untouched.
 ## Uninstall
 
 **Settings** › **Apps** › **Installed apps** › **Vertical Tabs for File Explorer** › **Uninstall**. The
-uninstaller closes the tray app and asks whether to delete the settings and saved data too. Windows that are
-open keep the vertical tabs until File Explorer restarts (or until you sign out).
+uninstaller closes the tray app, so open windows go back to File Explorer's normal tabs right away, and asks
+whether to delete the settings and saved data too.
 
 ## Limitations
 

@@ -17,6 +17,10 @@ namespace xpx::mod
         // [Debug]
         bool verboseLog = false;   // log dettagliato della mod (come quello della tray)
 
+        // Tray chiusa con "Esci" (kTrayExitedFile): schede verticali e barra delle cartelle valgono spente, senza toccare
+        // settings.ini (la mod vi salva solo larghezza e stato compresso).
+        bool trayExited = false;
+
         // Test automatici: se esiste dev-windows.txt (un HWND per riga, in esadecimale), le schede verticali
         // valgono solo per quelle finestre; le altre (dell'utente) restano come sono.
         bool devAllowlist = false;

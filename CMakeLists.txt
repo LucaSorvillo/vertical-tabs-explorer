@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(VTabsExplorer VERSION 1.4.1 LANGUAGES CXX RC)
+project(VTabsExplorer VERSION 1.4.2 LANGUAGES CXX RC)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "VTabsExplorer va compilato a 64 bit (x64).")

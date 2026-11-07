@@ -14,6 +14,11 @@ namespace xpx
 {
     inline constexpr wchar_t kModDllName[] = L"VTabsExplorerMod.dll";
 
+    // Nella cartella dei dati mentre la tray è chiusa con "Esci" (o --exit): la mod si spegne in tutte le finestre come con
+    // le funzioni spente dal menu, e si riaccende quando la tray riparte (che lo cancella). Un crash della tray o la fine
+    // della sessione non lo creano. --exit --keep-mods (compilazione, prove) esce senza crearlo.
+    inline constexpr wchar_t kTrayExitedFile[] = L"tray-exited.txt";
+
     // Lingua dei testi dell'app (menu e avvisi della tray, menu e suggerimenti della mod): l'italiano se la lingua
     // di visualizzazione di Windows dell'utente è l'italiano, altrimenti l'inglese. Si legge una volta per
     // processo: cambiare la lingua di Windows richiede di disconnettersi.

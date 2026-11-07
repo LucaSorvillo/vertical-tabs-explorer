@@ -4,7 +4,7 @@
 
 #define AppName "Vertical Tabs for File Explorer"
 #define AppShortName "VTabsExplorer"
-#define AppVersion "1.4.1"
+#define AppVersion "1.4.2"
 #define AppPublisher "LucaSorvillo"
 #define AppRepo "https://github.com/LucaSorvillo/vertical-tabs-explorer"
 #define AppSite "https://lucasorvillo.github.io/vertical-tabs-explorer/"
@@ -54,8 +54,6 @@ english.AutoStart=Start {#AppName} when Windows starts (needed to reopen your fo
 italian.AutoStart=Avvia {#AppName} all'avvio di Windows (serve a riaprire le cartelle dopo un riavvio)
 english.RemoveData=Do you also want to delete the settings and saved data (last session, closed tabs, bar groups, tab colors)?
 italian.RemoveData=Vuoi eliminare anche le impostazioni e i dati salvati (ultima sessione, schede chiuse, gruppi della barra, colori delle schede)?
-english.RestartNote=The vertical tabs stay in the windows that are already open until File Explorer restarts (or you sign out).
-italian.RestartNote=Le schede verticali restano nelle finestre già aperte finché Esplora file non si riavvia (o fino alla disconnessione).
 english.TrayNote=The app runs in the notification area (tray): right-click its icon for the options.
 italian.TrayNote=L'app resta nell'area di notifica (tray): clic destro sulla sua icona per le opzioni.
 english.VerticalTabs=Turn on the vertical tabs (column on the left)
@@ -134,7 +132,5 @@ begin
     if DirExists(Data) and (not UninstallSilent) then
       if MsgBox(CustomMessage('RemoveData'), mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
         DelTree(Data, True, True, True);
-    if not UninstallSilent then
-      MsgBox(CustomMessage('RestartNote'), mbInformation, MB_OK);
   end;
 end;

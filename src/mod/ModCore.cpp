@@ -667,14 +667,22 @@ namespace xpx::mod
                 const ModSettings loaded = ModSettings::Load();
                 SetVerbose(loaded.verboseLog);
                 bool changed = false;
+                bool wasExited = false;
                 {
                     std::scoped_lock lock(m_lock);
                     changed = !(loaded == m_settings);
+                    wasExited = m_settings.trayExited;
                     m_settings = loaded;
+                }
+                if (loaded.trayExited != wasExited)
+                {
+                    XPX_MLOG(loaded.trayExited ? L"Tray chiusa con \"Esci\": la mod si spegne in tutte le finestre (come con le funzioni spente)."
+                                               : L"Tray di nuovo avviata: la mod si riaccende con le impostazioni salvate.");
                 }
                 if (changed)
                 {
-                    XPX_MLOG(L"Impostazioni cambiate: schede verticali %s, larghezza %d.", loaded.verticalTabs ? L"sì" : L"no", loaded.width);
+                    XPX_MLOG(L"Impostazioni cambiate: schede verticali %s, barra delle cartelle %s, larghezza %d.", loaded.verticalTabs ? L"sì" : L"no",
+                             loaded.navBar ? L"sì" : L"no", loaded.width);
                     ApplySettingsToAllWindows();
                 }
             }

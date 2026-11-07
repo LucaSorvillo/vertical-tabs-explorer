@@ -9,7 +9,8 @@
 //   VTabsExplorer.exe                avvia la tray (istanza singola)
 //   VTabsExplorer.exe --restore-now  chiede alla tray di riaprire subito l'ultima sessione
 //   VTabsExplorer.exe --reopen-tab   riapre l'ultima scheda chiusa (come Ctrl+Maiusc+T)
-//   VTabsExplorer.exe --exit         chiude la tray in esecuzione
+//   VTabsExplorer.exe --exit         chiude la tray in esecuzione (come "Esci": la mod si spegne nelle finestre aperte)
+//   VTabsExplorer.exe --exit --keep-mods  (compilazione, prove) chiude la tray lasciando la mod accesa
 //   VTabsExplorer.exe --inject-pid N (sviluppo) inietta la mod delle schede verticali nell'explorer.exe N,
 //                                 mai in quello della barra delle applicazioni
 //
@@ -56,7 +57,31 @@ namespace
         IdExit,
         IdNavBar, // in fondo: i numeri di quelle prima li usano i test (101 "Riapri ora", 104 schede verticali)
         IdOpenInTabs,
+        IdExitKeepMods, // --exit --keep-mods (non nel menu)
     };
+
+    std::wstring TrayExitedPath()
+    {
+        return xpx::DataDirectory() + L"\\" + xpx::kTrayExitedFile;
+    }
+
+    // "Esci": la mod si spegne in tutte le finestre di Esplora file aperte (le rilegge da sola: vede comparire il file), come
+    // se le funzioni fossero spente dal menu; le impostazioni restano quelle scelte. Si riaccende quando la tray riparte.
+    void SignalModsOff()
+    {
+        const HANDLE file = CreateFileW(TrayExitedPath().c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, CREATE_ALWAYS,
+                                        FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (file == INVALID_HANDLE_VALUE)
+        {
+            xpx::Log(L"Esci: segnale per la mod non scritto (%lu): la mod resta accesa fino al riavvio di Esplora file.", GetLastError());
+            return;
+        }
+        static const char kText[] = "VTabsExplorer closed with Exit: the mod is off until the tray starts again.\r\n";
+        DWORD written = 0;
+        WriteFile(file, kText, sizeof(kText) - 1, &written, nullptr);
+        CloseHandle(file);
+        xpx::Log(L"Esci: la mod si spegne nelle finestre di Esplora file aperte.");
+    }
 
     xpx::Worker g_worker;
     xpx::ModManager g_mods;
@@ -65,6 +90,7 @@ namespace
     HWND g_trayWindow = nullptr;
     std::mutex g_noticeLock;
     std::wstring g_pendingNotice;
+    bool g_modsOffOnExit = false; // "Esci" (non --keep-mods, non la fine della sessione)
 
     bool IsDevModeActive()
     {
@@ -285,6 +311,11 @@ namespace
             xpx::Log(L"Modalità prova disattivata (dev-filter.txt rimosso).");
             break;
         case IdExit:
+            g_modsOffOnExit = true; // dopo l'ultimo salvataggio della sessione (fine di wWinMain)
+            DestroyWindow(hwnd);
+            break;
+        case IdExitKeepMods:
+            xpx::Log(L"Uscita con --keep-mods: la mod resta accesa.");
             DestroyWindow(hwnd);
             break;
         default:
@@ -451,7 +482,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
     UINT forward = 0;
     if (HasArgument(L"--exit"))
     {
-        forward = IdExit;
+        forward = HasArgument(L"--keep-mods") ? IdExitKeepMods : IdExit;
     }
     else if (HasArgument(L"--restore-now"))
     {
@@ -485,6 +516,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
         xpx::Log(L"Primo avvio: impostazioni create e avvio con Windows attivato.");
     }
     xpx::SetVerbose(xpx::Settings::Load().verboseLog);
+    // Chiusa l'ultima volta con "Esci": la mod nelle finestre aperte si riaccende (vede sparire il file).
+    if (DeleteFileW(TrayExitedPath().c_str()))
+    {
+        xpx::Log(L"Avvio dopo \"Esci\": la mod si riaccende nelle finestre di Esplora file aperte.");
+    }
     SetUnhandledExceptionFilter(OnCrash);
     std::set_terminate([] {
         g_worker.EmergencyLift();
@@ -529,6 +565,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
 
     g_mods.Stop();
     g_worker.Stop();
+    // Dopo il lavoro della tray (la sessione è salvata coi colori che la mod pubblica finché è accesa).
+    if (g_modsOffOnExit)
+    {
+        SignalModsOff();
+    }
     xpx::Log(L"VTabsExplorer chiuso.");
     if (g_icon)
     {
