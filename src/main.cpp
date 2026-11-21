@@ -58,6 +58,7 @@ namespace
         IdNavBar, // in fondo: i numeri di quelle prima li usano i test (101 "Riapri ora", 104 schede verticali)
         IdOpenInTabs,
         IdExitKeepMods, // --exit --keep-mods (non nel menu)
+        IdNavBarHoverOpen,
     };
 
     std::wstring TrayExitedPath()
@@ -229,6 +230,9 @@ namespace
         }
         AppendMenuW(menu, MF_STRING | (settings.navBar && !settings.verticalTabsSuspended ? MF_CHECKED : 0), IdNavBar,
                     xpx::Tr(L"Navigation pane at the top (folders bar)", L"Riquadro di spostamento in alto (barra delle cartelle)"));
+        // Opzione della barra (rientrata sotto di lei, grigia se la barra è spenta): i gruppi si aprono passandoci sopra.
+        AppendMenuW(menu, MF_STRING | (settings.navBarHoverOpen ? MF_CHECKED : 0) | (settings.navBar && !settings.verticalTabsSuspended ? 0 : MF_GRAYED),
+                    IdNavBarHoverOpen, xpx::Tr(L"      Open groups on mouse hover, without clicking", L"      Apri i gruppi al passaggio del mouse, senza clic"));
         AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
         AppendMenuW(menu, MF_STRING | (IsAutostartEnabled() ? MF_CHECKED : 0), IdAutostart, xpx::Tr(L"Start with Windows", L"Avvia con Windows"));
         AppendMenuW(menu, MF_STRING, IdOpenData, xpx::Tr(L"Open settings and log folder", L"Apri cartella impostazioni e log"));
@@ -287,6 +291,13 @@ namespace
             settings.verticalTabsSuspended = false;
             settings.Save();
             xpx::Log(L"Riquadro di spostamento in alto: %s.", settings.navBar ? L"sì" : L"no");
+            g_mods.Wake();
+            break;
+        case IdNavBarHoverOpen:
+            // Anche questa la legge la mod da settings.ini.
+            settings.navBarHoverOpen = !settings.navBarHoverOpen;
+            settings.Save();
+            xpx::Log(L"Gruppi della barra delle cartelle aperti al passaggio del mouse: %s.", settings.navBarHoverOpen ? L"sì" : L"no");
             g_mods.Wake();
             break;
         case IdOpenInTabs:

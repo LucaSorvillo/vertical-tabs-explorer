@@ -76,7 +76,9 @@ Chrome. Funziona con o senza le schede verticali.
   elenca al massimo 50 cartelle di Accesso rapido, e la barra mostra le stesse.
 - **Gruppi**: raccolgono cartelle e altri gruppi, uno dentro l'altro senza limiti.
   - Un clic su un gruppo apre il suo elenco. Con un elenco aperto, passando su un altro gruppo si apre subito
-    il suo, come in Chrome.
+    il suo, come in Chrome. Con **Apri i gruppi al passaggio del mouse** nel menu della tray (spenta di norma),
+    basta fermarsi un attimo su un gruppo per aprire il suo elenco senza clic; si chiude quando il puntatore lascia
+    la barra e l'elenco.
   - Il clic centrale su un gruppo apre tutte le sue cartelle in schede nuove.
   - Il clic destro su un gruppo offre "Apri tutte", "Nuovo gruppo…", "Rinomina…" ed "Elimina gruppo".
   - I gruppi esistono solo nella barra: le cartelle restano in Accesso rapido.
@@ -178,6 +180,7 @@ Tutto è nel menu della tray (clic destro sull'icona):
 | Cartelle aperte da altri programmi in una scheda (come Chrome) | attiva |
 | Schede verticali (colonna a sinistra) | scelta nell'installazione |
 | Riquadro di spostamento in alto (barra delle cartelle) | scelta nell'installazione |
+| Apri i gruppi al passaggio del mouse, senza clic (barra delle cartelle) | spenta |
 | Avvia con Windows | scelta nell'installazione |
 | Apri cartella impostazioni e log | |
 | Esci | |

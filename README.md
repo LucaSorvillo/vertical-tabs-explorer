@@ -74,7 +74,8 @@ without the vertical tabs.
   itself isn't moved or copied. Windows lists at most 50 Quick Access folders, and the bar shows the same ones.
 - **Groups**: collect folders and other groups, nested as deep as you like.
   - Click a group to open its list. Once a list is open, hovering another group switches to it at once, like
-    in Chrome.
+    in Chrome. With **Open groups on mouse hover** in the tray menu (off by default), resting the pointer on a
+    group for a moment opens its list without a click; it closes when the pointer leaves the bar and the list.
   - Middle-click a group to open all its folders in new tabs.
   - Right-click a group for "Open all", "New group…", "Rename…" and "Delete group".
   - Groups exist only in the bar: the folders stay in Quick Access.
@@ -176,6 +177,7 @@ Everything is in the tray menu (right-click the icon):
 | Folders opened by other apps go into a tab (like Chrome) | on |
 | Vertical tabs (column on the left) | chosen in the setup |
 | Navigation pane at the top (folders bar) | chosen in the setup |
+| Open groups on mouse hover, without clicking (folders bar) | off |
 | Start with Windows | chosen in the setup |
 | Open settings and log folder | |
 | Exit | |

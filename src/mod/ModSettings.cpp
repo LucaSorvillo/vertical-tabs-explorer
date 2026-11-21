@@ -77,6 +77,7 @@ namespace xpx::mod
         s.width = std::clamp(static_cast<int>(GetPrivateProfileIntW(L"VerticalTabs", L"Width", s.width, file.c_str())), kMinWidth, kMaxWidth);
         s.collapsed = GetPrivateProfileIntW(L"VerticalTabs", L"Collapsed", s.collapsed ? 1 : 0, file.c_str()) != 0;
         s.navBar = GetPrivateProfileIntW(L"NavBar", L"Enabled", s.navBar ? 1 : 0, file.c_str()) != 0;
+        s.navBarHoverOpen = GetPrivateProfileIntW(L"NavBar", L"HoverOpen", s.navBarHoverOpen ? 1 : 0, file.c_str()) != 0;
         s.verboseLog = GetPrivateProfileIntW(L"Debug", L"VerboseLog", s.verboseLog ? 1 : 0, file.c_str()) != 0;
         s.devAllowlist = ReadDevWindows(s.devWindows);
         // Tray chiusa con "Esci": tutto spento finché non riparte (qui solo in lettura: il file resta com'è).

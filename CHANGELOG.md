@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 — 2026-11-21
+
+- Folders bar: new tray option **Open groups on mouse hover, without clicking** (off by default, right under
+  "Navigation pane at the top"). Rest the pointer on a group of the bar for a moment and its list opens without a
+  click; it closes when the pointer leaves the bar and the list. A list opened this way doesn't take the keyboard
+  focus, and clicking its group keeps it open, as if you had clicked it in the first place.
+
 ## 1.5.1 — 2026-11-07
 
 - Fixed: closing the app with **Exit** while a File Explorer window was being dragged, or while its system menu was

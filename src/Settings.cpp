@@ -16,6 +16,7 @@ namespace xpx
         s.verticalTabsSuspended = GetPrivateProfileIntW(L"VerticalTabs", L"Suspended", s.verticalTabsSuspended ? 1 : 0, file.c_str()) != 0;
         s.skipShellProcess = GetPrivateProfileIntW(L"VerticalTabs", L"SkipShellProcess", s.skipShellProcess ? 1 : 0, file.c_str()) != 0;
         s.navBar = GetPrivateProfileIntW(L"NavBar", L"Enabled", s.navBar ? 1 : 0, file.c_str()) != 0;
+        s.navBarHoverOpen = GetPrivateProfileIntW(L"NavBar", L"HoverOpen", s.navBarHoverOpen ? 1 : 0, file.c_str()) != 0;
         s.verboseLog = GetPrivateProfileIntW(L"Debug", L"VerboseLog", s.verboseLog ? 1 : 0, file.c_str()) != 0;
         return s;
     }
@@ -30,6 +31,7 @@ namespace xpx
         ok &= WritePrivateProfileStringW(L"VerticalTabs", L"Enabled", verticalTabs ? L"1" : L"0", file.c_str()) != FALSE;
         ok &= WritePrivateProfileStringW(L"VerticalTabs", L"Suspended", verticalTabsSuspended ? L"1" : L"0", file.c_str()) != FALSE;
         ok &= WritePrivateProfileStringW(L"NavBar", L"Enabled", navBar ? L"1" : L"0", file.c_str()) != FALSE;
+        ok &= WritePrivateProfileStringW(L"NavBar", L"HoverOpen", navBarHoverOpen ? L"1" : L"0", file.c_str()) != FALSE;
         ok &= WritePrivateProfileStringW(L"Debug", L"VerboseLog", verboseLog ? L"1" : L"0", file.c_str()) != FALSE;
         return ok;
     }

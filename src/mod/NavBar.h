@@ -22,7 +22,8 @@ namespace xpx::mod
     // riaccende (WindowLayout::SetBar).
     //
     // Gruppi (NavGroups), come le cartelle dei segnalibri: nel blocco delle cartelle aggiunte, con l'icona di una
-    // pila di cartelle; clic: l'elenco del contenuto (i sottogruppi si aprono a lato, anche solo fermandosi sopra);
+    // pila di cartelle; clic: l'elenco del contenuto (i sottogruppi si aprono a lato, anche solo fermandosi sopra; con
+    // l'opzione della tray anche i gruppi della barra, vedi SetHoverOpen);
     // clic centrale: tutte le sue cartelle in schede nuove; clic destro: Apri tutte, Nuovo gruppo, Rinomina,
     // Elimina gruppo (il contenuto torna al livello di sopra). Clic destro sullo sfondo della barra: Nuovo gruppo;
     // nel menu classico di una cartella aggiunta ("Mostra altre opzioni"): "Sposta nel gruppo" e "Togli dal gruppo".
@@ -60,6 +61,9 @@ namespace xpx::mod
         void OnTick();
         void SetTheme(winrt::Microsoft::UI::Xaml::ElementTheme theme);
         void SetVisible(bool shown);
+        // Opzione della tray "Apri i gruppi al passaggio del mouse" ([NavBar] HoverOpen, spenta di norma): fermi su un gruppo
+        // della barra si apre il suo elenco senza clic; aperto così si chiude quando il puntatore lascia barra ed elenchi.
+        void SetHoverOpen(bool on);
         // WM_CONTEXTMENU arrivato alla finestra principale (es. il menu nuovo che si riapre da sé dopo un clic destro
         // mentre quello di prima si chiudeva): true se il punto è su una voce della barra (menu aperto lì).
         bool OnContextMenuAt(POINT screen);
@@ -201,6 +205,23 @@ namespace xpx::mod
         // la cartella aperta nella barra dei segnalibri di Chrome: lo sfondo del passaggio del mouse.
         void SetOpenHighlight(std::shared_ptr<Level> const& level, bool on);
         winrt::Microsoft::UI::Xaml::Media::SolidColorBrush OpenHighlightBrush() const;
+        // Il pulsante della barra da cui si apre un elenco di primo livello (il gruppo, o "»").
+        winrt::Microsoft::UI::Xaml::Controls::Button BarButtonOf(std::shared_ptr<Level> const& level) const;
+        // --- gruppi al passaggio del mouse (SetHoverOpen) ---
+        // Il puntatore entra in un gruppo della barra (o ne esce): con l'opzione, fermo lì per kBarHoverOpenDelay, si apre il suo
+        // elenco (OnBarHoverTimer) senza prendere il fuoco (FlyoutShowMode::Transient: la tastiera resta dov'era e WinUI lascia
+        // arrivare alla barra l'input sopra l'isola, così il passaggio agli altri gruppi e i clic sulla barra restano quelli).
+        void OnBarGroupPointer(std::wstring const& key, bool entered);
+        void OnBarHoverTimer();
+        // Da OnSwitchTimer, con gli elenchi aperti passandoci sopra: chiusi se il puntatore resta fuori da barra ed elenchi per
+        // kHoverCloseMs, a un clic fuori o se la finestra non è più in primo piano (true = chiusi).
+        bool CloseHoverLevelsIfLeft(POINT cursor);
+        // Pressione sul pulsante del gruppo aperto passandoci sopra: WinUI chiuderebbe l'elenco (light dismiss) e il clic lo
+        // riaprirebbe; resta aperto e da lì vale come aperto col clic.
+        void OnLevelClosing(std::shared_ptr<Level> const& level, winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutBaseClosingEventArgs const& args);
+        // Menu dei gruppi e della barra, riquadro del nome: finché sono aperti gli elenchi aperti passandoci sopra restano.
+        void TrackOtherFlyout(winrt::Microsoft::UI::Xaml::Controls::Primitives::FlyoutBase const& flyout);
+        bool OurWindowInForeground() const;
         // Comando di prova "navbar group hover <gruppo>": il controllo del cambio usa questo punto invece del cursore vero
         // (si prova senza muovere il mouse dell'utente); "hover off" lo toglie.
         std::optional<POINT> m_testCursor;
@@ -352,6 +373,23 @@ namespace xpx::mod
         std::function<void()> m_hoverAction;               // al passare del puntatore su una riga, dopo un attimo
         winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_dragTimer{ nullptr };
         winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_switchTimer{ nullptr };
+        // Gruppi al passaggio del mouse (SetHoverOpen): l'opzione; se gli elenchi aperti sono stati aperti passandoci sopra
+        // (non col clic); l'elenco chiesto passandoci sopra e quando (con un altro elenco aperto WinUI lo apre solo dopo aver
+        // chiuso quello: OnLevelOpening arriva più tardi); da quando il puntatore è fuori da barra ed elenchi (0 = dentro); il
+        // gruppo della barra in attesa di aprirsi (e da quando); quello appena chiuso col puntatore sopra (si riapre solo
+        // uscendo e rientrando); le nostre chiusure degli elenchi in corso; i menu e il riquadro del nome aperti.
+        bool m_hoverOpenEnabled = false;
+        bool m_hoverOpened = false;
+        std::weak_ptr<Level> m_hoverOpeningLevel;
+        ULONGLONG m_hoverOpeningAt = 0;
+        bool HoverOpenPending() const;
+        ULONGLONG m_hoverLeftAt = 0;
+        std::wstring m_hoverPendingKey;
+        ULONGLONG m_hoverPendingSince = 0;
+        std::wstring m_hoverBlockedKey;
+        int m_hidingLevels = 0;
+        int m_otherFlyouts = 0;
+        winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_barHoverTimer{ nullptr };
         winrt::Microsoft::UI::Xaml::Controls::Flyout m_nameEditor{ nullptr };
         winrt::Microsoft::UI::Xaml::Controls::TextBox m_nameBox{ nullptr };
         std::shared_ptr<const NavSnapshot> m_snapshot;

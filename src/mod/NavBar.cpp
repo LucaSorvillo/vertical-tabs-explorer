@@ -45,6 +45,14 @@ namespace xpx::mod
         constexpr double kDropTolerance = 12;           // DIP sopra e sotto la barra in cui si lascia ancora nella barra
         constexpr ULONGLONG kOpenListAfterMs = 600;      // fermi su "»" o su un gruppo trascinando: si apre il suo elenco
         constexpr auto kHoverDelay = std::chrono::milliseconds(400); // fermi su una riga: si apre il sottogruppo (o si chiude)
+        // Gruppi al passaggio del mouse (opzione della tray): fermi su un gruppo della barra per questo tempo si apre il suo
+        // elenco (passando soltanto, ad esempio per andare dalla vista dei file alla barra degli indirizzi, no); aperto così,
+        // si chiude se il puntatore resta fuori da barra ed elenchi (con kNearDip di margine) per kHoverCloseMs.
+        constexpr auto kBarHoverOpenDelay = std::chrono::milliseconds(300);
+        constexpr ULONGLONG kHoverCloseMs = 400;
+        // Elenco chiesto passandoci sopra al posto di un altro: WinUI chiude prima quello aperto e apre il nuovo dopo (staged);
+        // se entro questo tempo non si apre, la richiesta non vale più.
+        constexpr ULONGLONG kHoverOpeningMs = 1000;
         constexpr int kIconDip = 16;
         constexpr UINT kGetShellBrowser = WM_USER + 7; // CWM_GETISHELLBROWSER: IShellBrowser della finestra (stesso processo)
         constexpr uint32_t kPinnedSortIndex = 0x48;      // posto delle cartelle aggiunte nel riquadro (NavItems.h)
@@ -70,6 +78,21 @@ namespace xpx::mod
         // Registro dettagliato del trascinamento (comando di prova "navbar dragdebug on|off"): pressioni,
         // primi movimenti, rilasci. Spento di norma: una riga per pressione sarebbe rumore.
         bool g_dragDebug = false;
+
+        // Contatore acceso per la durata di un blocco (anche se il blocco esce con un'eccezione).
+        struct Counting
+        {
+            int& value;
+            explicit Counting(int& counter) : value(counter) { ++value; }
+            ~Counting() { --value; }
+            Counting(Counting const&) = delete;
+            Counting& operator=(Counting const&) = delete;
+        };
+
+        bool AnyMouseButtonDown()
+        {
+            return GetAsyncKeyState(VK_LBUTTON) < 0 || GetAsyncKeyState(VK_RBUTTON) < 0 || GetAsyncKeyState(VK_MBUTTON) < 0;
+        }
 
         // Modalità dimostrativa (solo sviluppo: screenshot e video). Con dev-navbar-demo.txt nella cartella dei dati, in un
         // explorer.exe che NON è quello della barra delle applicazioni (le finestre di prova separate), la barra mostra solo
@@ -530,6 +553,9 @@ namespace xpx::mod
             // Un fotogramma: il gruppo sotto il puntatore si apre subito (gira solo con un elenco della barra aperto, e con
             // il puntatore fuori dalla barra esce al primo controllo).
             m_switchTimer.Interval(std::chrono::milliseconds(16));
+            m_barHoverTimer = queue.CreateTimer();
+            m_barHoverTimer.IsRepeating(false);
+            m_barHoverTimer.Interval(kBarHoverOpenDelay);
         }
         catch (...)
         {
@@ -574,6 +600,12 @@ namespace xpx::mod
             if (const auto self = weak.lock())
             {
                 Guard(L"cambio di elenco", [&] { self->OnSwitchTimer(); });
+            }
+        });
+        m_barHoverTimer.Tick([weak](auto&&, auto&&) {
+            if (const auto self = weak.lock())
+            {
+                Guard(L"gruppo al passaggio del mouse", [&] { self->OnBarHoverTimer(); });
             }
         });
         // Durante un trascinamento il puntatore è catturato dalla radice della barra o dell'elenco.
@@ -623,6 +655,11 @@ namespace xpx::mod
         {
             m_switchTimer.Stop();
         }
+        if (m_barHoverTimer)
+        {
+            m_barHoverTimer.Stop();
+        }
+        m_hoverPendingKey.clear();
         if (m_openTimer)
         {
             m_openTimer.Stop();
@@ -691,6 +728,7 @@ namespace xpx::mod
         m_hoverTimer = nullptr;
         m_dragTimer = nullptr;
         m_switchTimer = nullptr;
+        m_barHoverTimer = nullptr;
         m_snapshot = nullptr;
         m_itemByKey.clear();
         m_hwnd = nullptr;
@@ -1110,6 +1148,19 @@ namespace xpx::mod
             mux::Automation::AutomationProperties::SetAutomationId(button, L"NavGroup");
             entry.level = MakeLevel(std::wstring{ GroupIdOf(key) }, 0);
             button.Flyout(entry.level->flyout);
+            // Con l'opzione "al passaggio del mouse" si apre anche restando fermi sul pulsante (OnBarGroupPointer).
+            button.PointerEntered([weak, key](auto&&, auto&&) {
+                if (const auto self = weak.lock())
+                {
+                    Guard(L"puntatore su un gruppo della barra", [&] { self->OnBarGroupPointer(key, true); });
+                }
+            });
+            button.PointerExited([weak, key](auto&&, auto&&) {
+                if (const auto self = weak.lock())
+                {
+                    Guard(L"puntatore fuori da un gruppo della barra", [&] { self->OnBarGroupPointer(key, false); });
+                }
+            });
         }
         else
         {
@@ -1250,6 +1301,14 @@ namespace xpx::mod
                 level->open = true;
             }
         });
+        level->flyout.Closing([weak, weakLevel](auto&&, muxcp::FlyoutBaseClosingEventArgs const& args) {
+            const auto self = weak.lock();
+            const auto level = weakLevel.lock();
+            if (self && level)
+            {
+                Guard(L"elenco in chiusura", [&] { self->OnLevelClosing(level, args); });
+            }
+        });
         level->flyout.Closed([weak, weakLevel](auto&&, auto&&) {
             const auto self = weak.lock();
             const auto level = weakLevel.lock();
@@ -1316,6 +1375,7 @@ namespace xpx::mod
             m_levels.pop_back();
             if (last != level && last->open)
             {
+                const Counting hiding(m_hidingLevels);
                 last->flyout.Hide();
             }
         }
@@ -1323,6 +1383,15 @@ namespace xpx::mod
         FillLevel(level);
         if (level->depth == 0)
         {
+            // Aperto passandoci sopra (OnBarHoverTimer, o cambiando da un elenco aperto così) o col clic.
+            m_hoverOpened = HoverOpenPending() && m_hoverOpeningLevel.lock() == level;
+            m_hoverOpeningLevel.reset();
+            m_hoverLeftAt = 0;
+            m_hoverPendingKey.clear();
+            if (m_barHoverTimer)
+            {
+                m_barHoverTimer.Stop();
+            }
             SetOpenHighlight(level, true);
             // Aperto dalla barra: da qui si può passare agli altri gruppi della barra solo col puntatore.
             if (m_switchTimer && !m_switchTimer.IsRunning())
@@ -1337,10 +1406,14 @@ namespace xpx::mod
         // (Trascinando, dalla barra o da fuori, un altro gruppo si apre restando fermi su di lui: OpenHoveredLevel.)
         if (m_levels.empty() || m_drag.armed || m_external.active || !m_hwnd)
         {
-            if (m_levels.empty() && m_switchTimer)
+            // (Cambiando elenco passandoci sopra, fra la chiusura di quello vecchio e l'apertura del nuovo non ce n'è nessuno:
+            // la catena continua, e il controllo con lei.)
+            if (m_levels.empty() && m_switchTimer && !HoverOpenPending())
             {
                 m_switchTimer.Stop();
                 m_testCursor.reset(); // (comando di prova: vale finché resta aperto un elenco)
+                m_hoverOpened = false;
+                m_hoverLeftAt = 0;
             }
             return;
         }
@@ -1352,6 +1425,11 @@ namespace xpx::mod
         else
         {
             GetCursorPos(&cursor);
+        }
+        // Aperti passandoci sopra: si chiudono quando il puntatore se ne va.
+        if (m_hoverOpened && CloseHoverLevelsIfLeft(cursor))
+        {
+            return;
         }
         std::shared_ptr<Level> target;
         mux::FrameworkElement anchor{ nullptr };
@@ -1394,7 +1472,10 @@ namespace xpx::mod
         {
             XPX_MVLOG(L"NavBar: elenco cambiato passandoci sopra (%s).", key == L"»" ? L"»" : L"gruppo");
         }
-        ShowLevel(target, anchor, false);
+        // Da un elenco aperto passandoci sopra anche il nuovo è aperto così (senza fuoco, si chiude andando via).
+        m_hoverOpeningLevel = m_hoverOpened ? target : nullptr;
+        m_hoverOpeningAt = GetTickCount64();
+        ShowLevel(target, anchor, m_hoverOpened);
     }
 
     bool NavBar::IsUnder(mux::FrameworkElement const& element, POINT screen) const
@@ -1415,28 +1496,29 @@ namespace xpx::mod
         return x >= origin.X && x < origin.X + element.ActualWidth() && y >= origin.Y && y < origin.Y + element.ActualHeight();
     }
 
-    void NavBar::SetOpenHighlight(std::shared_ptr<Level> const& level, bool on)
+    muxc::Button NavBar::BarButtonOf(std::shared_ptr<Level> const& level) const
     {
         if (!level || level->depth != 0)
         {
-            return;
+            return nullptr;
         }
-        muxc::Button button{ nullptr };
         if (level == m_overflowLevel)
         {
-            button = m_overflow;
+            return m_overflow;
         }
-        else
+        for (auto const& entry : m_entries)
         {
-            for (auto const& entry : m_entries)
+            if (entry.level == level)
             {
-                if (entry.level == level)
-                {
-                    button = entry.button;
-                    break;
-                }
+                return entry.button;
             }
         }
+        return nullptr;
+    }
+
+    void NavBar::SetOpenHighlight(std::shared_ptr<Level> const& level, bool on)
+    {
+        const muxc::Button button = BarButtonOf(level);
         if (!button)
         {
             return;
@@ -1474,11 +1556,237 @@ namespace xpx::mod
         return muxm::SolidColorBrush(dark ? winrt::Windows::UI::Color{ 0x15, 0xFF, 0xFF, 0xFF } : winrt::Windows::UI::Color{ 0x80, 0xF9, 0xF9, 0xF9 });
     }
 
+    // --- Gruppi al passaggio del mouse (opzione della tray) ---------------------------------------------------------
+
+    void NavBar::SetHoverOpen(bool on)
+    {
+        if (on == m_hoverOpenEnabled)
+        {
+            return;
+        }
+        m_hoverOpenEnabled = on;
+        if (!on)
+        {
+            m_hoverPendingKey.clear();
+            if (m_barHoverTimer)
+            {
+                m_barHoverTimer.Stop();
+            }
+        }
+        XPX_MLOG(L"NavBar: gruppi aperti al passaggio del mouse: %s.", on ? L"sì" : L"no");
+    }
+
+    bool NavBar::OurWindowInForeground() const
+    {
+        // La finestra, o una sua finestra a comparsa (un menu aperto): le finestre degli elenchi non prendono il primo piano.
+        const HWND foreground = GetForegroundWindow();
+        return foreground && m_main && (foreground == m_main || GetAncestor(foreground, GA_ROOTOWNER) == m_main);
+    }
+
+    void NavBar::OnBarGroupPointer(std::wstring const& key, bool entered)
+    {
+        if (!entered)
+        {
+            if (m_hoverBlockedKey == key)
+            {
+                m_hoverBlockedKey.clear(); // uscito: rientrando si riapre
+            }
+            if (m_hoverPendingKey == key)
+            {
+                m_hoverPendingKey.clear();
+                if (m_barHoverTimer)
+                {
+                    m_barHoverTimer.Stop();
+                }
+            }
+            return;
+        }
+        // Solo con la barra senza elenchi aperti (con un elenco aperto il passaggio agli altri gruppi lo fa OnSwitchTimer) e
+        // senza trascinamenti (lì gli elenchi si aprono restando fermi: OpenHoveredLevel).
+        if (!m_hoverOpenEnabled || !m_barHoverTimer || key == m_hoverBlockedKey || !m_levels.empty() || m_drag.armed || m_external.active)
+        {
+            return;
+        }
+        m_hoverPendingKey = key;
+        m_hoverPendingSince = GetTickCount64();
+        m_barHoverTimer.Stop();
+        m_barHoverTimer.Start();
+    }
+
+    void NavBar::OnBarHoverTimer()
+    {
+        const std::wstring key = std::exchange(m_hoverPendingKey, std::wstring{});
+        if (key.empty() || !m_hoverOpenEnabled || !m_levels.empty() || m_drag.armed || m_external.active || m_menuOpen || m_otherFlyouts > 0 ||
+            (m_modernMenu && m_modernMenu->IsOpen()))
+        {
+            return;
+        }
+        // Il cursore di prova (comando "hoveropen") non chiede la finestra in primo piano né guarda i tasti veri del mouse.
+        const bool test = m_testCursor.has_value();
+        POINT cursor{};
+        if (test)
+        {
+            cursor = *m_testCursor;
+        }
+        else if (!OurWindowInForeground() || AnyMouseButtonDown() || !GetCursorPos(&cursor))
+        {
+            return; // finestra dietro un'altra, o un tasto premuto (un clic o un trascinamento, non un passaggio)
+        }
+        const auto index = EntryAt(cursor);
+        if (!index || m_entries[*index].key != key || !m_entries[*index].level || !m_entries[*index].button)
+        {
+            return; // il puntatore non è più lì
+        }
+        const auto level = m_entries[*index].level;
+        const auto button = m_entries[*index].button;
+        if (test)
+        {
+            XPX_MLOG(L"NavBar: elenco aperto passandoci sopra (prova), %llu ms dopo l'entrata.", GetTickCount64() - m_hoverPendingSince);
+        }
+        else
+        {
+            XPX_MVLOG(L"NavBar: elenco aperto passandoci sopra.");
+        }
+        m_hoverOpeningLevel = level;
+        m_hoverOpeningAt = GetTickCount64();
+        ShowLevel(level, button, /*transient*/ true);
+    }
+
+    bool NavBar::HoverOpenPending() const
+    {
+        return !m_hoverOpeningLevel.expired() && GetTickCount64() - m_hoverOpeningAt < kHoverOpeningMs;
+    }
+
+    bool NavBar::CloseHoverLevelsIfLeft(POINT cursor)
+    {
+        // Un menu (di un gruppo, della barra, contestuale) o il riquadro del nome: gli elenchi restano finché c'è.
+        if (m_otherFlyouts > 0 || m_menuOpen || (m_modernMenu && m_modernMenu->IsOpen()))
+        {
+            m_hoverLeftAt = 0;
+            return false;
+        }
+        const bool test = m_testCursor.has_value();
+        const ULONGLONG now = GetTickCount64();
+        const wchar_t* why = nullptr;
+        if (!test && !OurWindowInForeground())
+        {
+            why = L"la finestra non è più in primo piano";
+        }
+        else if (NearBarOrLevels(cursor))
+        {
+            m_hoverLeftAt = 0; // sulla barra (anche su un'altra voce, come Chrome) o su un elenco aperto
+            return false;
+        }
+        else if (!test && AnyMouseButtonDown())
+        {
+            why = L"clic fuori";
+        }
+        else if (!m_hoverLeftAt)
+        {
+            m_hoverLeftAt = now;
+            // Uscendo si può essere passati su un sottogruppo: non si apre più (gli elenchi stanno per chiudersi).
+            m_hoverAction = nullptr;
+            if (m_hoverTimer)
+            {
+                m_hoverTimer.Stop();
+            }
+            return false;
+        }
+        else if (now - m_hoverLeftAt < kHoverCloseMs)
+        {
+            return false;
+        }
+        else
+        {
+            why = L"il puntatore è uscito";
+        }
+        if (test)
+        {
+            XPX_MLOG(L"NavBar: elenchi aperti passandoci sopra chiusi (prova): %s, %llu ms dopo l'uscita.", why, m_hoverLeftAt ? now - m_hoverLeftAt : 0ULL);
+        }
+        else
+        {
+            XPX_MVLOG(L"NavBar: elenchi aperti passandoci sopra chiusi: %s.", why);
+        }
+        m_hoverLeftAt = 0;
+        CloseLevels(0);
+        return true;
+    }
+
+    void NavBar::OnLevelClosing(std::shared_ptr<Level> const& level, muxcp::FlyoutBaseClosingEventArgs const& args)
+    {
+        // Solo la chiusura di WinUI alla pressione (light dismiss), non le nostre (CloseLevels, un elenco al posto di un altro).
+        if (m_hidingLevels > 0 || !m_hoverOpened || level->depth != 0 || m_levels.empty() || m_levels.front() != level ||
+            GetAsyncKeyState(VK_LBUTTON) >= 0)
+        {
+            return;
+        }
+        const auto button = BarButtonOf(level);
+        POINT cursor{};
+        if (!button || !GetCursorPos(&cursor) || !IsUnder(button, cursor))
+        {
+            return;
+        }
+        args.Cancel(true);
+        m_hoverOpened = false;
+        m_hoverLeftAt = 0;
+        XPX_MLOG(L"NavBar: clic sul gruppo aperto passandoci sopra: l'elenco resta aperto, come aperto col clic.");
+        // Come aperto col clic anche per WinUI (fuoco e light dismiss di un elenco normale): ShowAt sullo stesso elenco aperto,
+        // dallo stesso pulsante, cambia solo il modo (FlyoutBase::UpdateStateToShowMode). Lo fa anche il clic (il flyout del
+        // pulsante), se arriva.
+        const std::weak_ptr<NavBar> weak = weak_from_this();
+        const std::weak_ptr<Level> weakLevel = level;
+        const winrt::weak_ref<muxc::Button> weakButton = button;
+        m_root.DispatcherQueue().TryEnqueue([weak, weakLevel, weakButton] {
+            const auto self = weak.lock();
+            const auto level = weakLevel.lock();
+            const auto button = weakButton.get();
+            if (self && level && button && level->open)
+            {
+                Guard(L"elenco tenuto aperto", [&] { self->ShowLevel(level, button, false); });
+            }
+        });
+    }
+
+    void NavBar::TrackOtherFlyout(muxcp::FlyoutBase const& flyout)
+    {
+        const std::weak_ptr<NavBar> weak = weak_from_this();
+        flyout.Opened([weak](auto&&, auto&&) {
+            if (const auto self = weak.lock())
+            {
+                ++self->m_otherFlyouts;
+            }
+        });
+        flyout.Closed([weak](auto&&, auto&&) {
+            if (const auto self = weak.lock())
+            {
+                self->m_otherFlyouts = std::max(0, self->m_otherFlyouts - 1);
+            }
+        });
+    }
+
     void NavBar::OnLevelClosed(std::shared_ptr<Level> const& level)
     {
         level->open = false;
         DetachLevelDropTarget(*level);
         SetOpenHighlight(level, false);
+        // Chiuso col puntatore sul suo pulsante (un clic, Esc): passandoci sopra si riapre solo dopo esserne usciti.
+        if (m_hoverOpenEnabled && level->depth == 0)
+        {
+            POINT cursor{};
+            const auto button = BarButtonOf(level);
+            if (button && GetCursorPos(&cursor) && IsUnder(button, cursor))
+            {
+                for (auto const& entry : m_entries)
+                {
+                    if (entry.level == level)
+                    {
+                        m_hoverBlockedKey = entry.key;
+                        break;
+                    }
+                }
+            }
+        }
         try
         {
             level->flyout.AreOpenCloseAnimationsEnabled(true); // (tolte se si era passati a lui o da lui passandoci sopra)
@@ -1740,6 +2048,7 @@ namespace xpx::mod
 
     void NavBar::CloseLevels(size_t fromDepth)
     {
+        const Counting hiding(m_hidingLevels);
         while (m_levels.size() > fromDepth)
         {
             const auto last = m_levels.back();
@@ -2560,6 +2869,7 @@ namespace xpx::mod
             options.Position(winrt::Windows::Foundation::IReference<Point>{ *position });
         }
         options.ShowMode(muxcp::FlyoutShowMode::Standard);
+        TrackOtherFlyout(menu);
         menu.ShowAt(anchor, options);
         XPX_MLOG(L"NavBar: menu di un gruppo (%zu cartelle).", folders);
     }
@@ -2587,6 +2897,7 @@ namespace xpx::mod
         muxcp::FlyoutShowOptions options;
         options.Position(winrt::Windows::Foundation::IReference<Point>{ position });
         options.ShowMode(muxcp::FlyoutShowMode::Standard);
+        TrackOtherFlyout(menu);
         menu.ShowAt(m_root, options);
     }
 
@@ -2771,6 +3082,7 @@ namespace xpx::mod
         });
         m_nameEditor = editor;
         m_nameBox = box;
+        TrackOtherFlyout(editor);
         editor.ShowAt(anchor);
         XPX_MLOG(L"NavBar: nome di un gruppo da %s.", created ? L"scegliere (gruppo nuovo)" : L"cambiare");
     }
@@ -4244,7 +4556,10 @@ namespace xpx::mod
     //   drag <voce> | dragto <x>|<y> | dragup | dragesc: un trascinamento vero (timer, elenchi che si aprono restando
     //   fermi, stacco dall'elenco di partenza) guidato da punto e tasto di prova: la pressione sulla voce (nell'elenco
     //   aperto più interno che la mostra, o nella barra), il cursore in pixel dello schermo, il rilascio, Esc
-    //   hover <gruppo>|>>|off: il cursore che vede il cambio d'elenco (OnSwitchTimer)
+    //   hover <gruppo>|>>|off: il cursore che vede il cambio d'elenco (OnSwitchTimer); hover away: lontano da barra ed
+    //   elenchi (in basso a sinistra nella finestra), hover list: al centro dell'elenco aperto più interno
+    //   hoveropen <gruppo>: il cursore di prova sul suo pulsante e il puntatore che ci entra, come PointerEntered (con
+    //   l'opzione "al passaggio del mouse" il suo elenco si apre dopo kBarHoverOpenDelay)
     void NavBar::DevGroupCommand(std::wstring const& command)
     {
         if (!m_groups || !m_snapshot)
@@ -4296,6 +4611,23 @@ namespace xpx::mod
                 {
                     center = CenterOfElement(m_overflow);
                 }
+                else if (rest == L"away")
+                {
+                    RECT client{};
+                    if (m_main && GetClientRect(m_main, &client))
+                    {
+                        POINT corner{ client.left + 24, client.bottom - 24 };
+                        ClientToScreen(m_main, &corner);
+                        center = corner;
+                    }
+                }
+                else if (rest == L"list")
+                {
+                    if (const auto rect = m_levels.empty() ? std::nullopt : LevelScreenRect(*m_levels.back()))
+                    {
+                        center = POINT{ (rect->left + rect->right) / 2, (rect->top + rect->bottom) / 2 };
+                    }
+                }
                 else
                 {
                     const std::wstring key = KeyByName(rest.rfind(L"g:", 0) == 0 ? rest : L"g:" + rest);
@@ -4317,6 +4649,29 @@ namespace xpx::mod
                 {
                     XPX_MLOG(L"NavBar: hover, pulsante non visibile nella barra.");
                 }
+            }
+        }
+        else if (verb == L"hoveropen")
+        {
+            // Come il puntatore che entra nel pulsante del gruppo (PointerEntered), con il cursore di prova sopra.
+            m_testCursor.reset();
+            const std::wstring key = KeyByName(rest.rfind(L"g:", 0) == 0 ? rest : L"g:" + rest);
+            for (size_t i = 0; i < m_entries.size() && i < m_visibleCount; ++i)
+            {
+                if (m_entries[i].key == key && m_entries[i].level)
+                {
+                    if (const auto center = CenterOf(i))
+                    {
+                        m_testCursor = *center;
+                        m_testCursorSince = GetTickCount64();
+                        OnBarGroupPointer(key, true);
+                    }
+                    break;
+                }
+            }
+            if (!m_testCursor)
+            {
+                XPX_MLOG(L"NavBar: hoveropen, gruppo non visibile nella barra.");
             }
         }
         else if (verb == L"drag" && !KeyByName(rest).empty())
@@ -4550,6 +4905,9 @@ namespace xpx::mod
             }
             XPX_MLOG(L"NavBar[gruppi]: evidenziati: %s; animazioni dell'elenco aperto: %s.", lit.empty() ? L"nessuno" : lit.c_str(),
                      m_levels.empty() ? L"-" : (m_levels.front()->flyout.AreOpenCloseAnimationsEnabled() ? L"sì" : L"no"));
+            // Gruppi al passaggio del mouse: l'opzione, e se gli elenchi aperti sono stati aperti così ("-" = nessuno aperto)
+            XPX_MLOG(L"NavBar[gruppi]: al passaggio del mouse: %s; elenchi aperti passandoci sopra: %s.", m_hoverOpenEnabled ? L"sì" : L"no",
+                     m_levels.empty() ? L"-" : (m_hoverOpened ? L"sì" : L"no"));
             // Suggerimenti dei gruppi della barra come sono sui pulsanti (UI Automation non li espone): solo il contenuto,
             // la riga dopo il nome.
             std::wstring tips;

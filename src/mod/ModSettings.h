@@ -13,6 +13,7 @@ namespace xpx::mod
 
         // [NavBar]
         bool navBar = false;       // riquadro di spostamento come barra orizzontale sotto la barra dei comandi
+        bool navBarHoverOpen = false; // HoverOpen: i gruppi della barra si aprono restandoci sopra col mouse, senza clic
 
         // [Debug]
         bool verboseLog = false;   // log dettagliato della mod (come quello della tray)

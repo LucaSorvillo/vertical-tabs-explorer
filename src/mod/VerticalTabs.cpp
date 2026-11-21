@@ -545,6 +545,10 @@ namespace xpx::mod
         {
             Guard(L"barra delle cartelle", [&] { DisableNavBar(); });
         }
+        if (m_navBar)
+        {
+            Guard(L"barra delle cartelle", [&] { m_navBar->SetHoverOpen(wanted.navBarHoverOpen); });
+        }
     }
 
     void VerticalTabs::EnableNavBar()

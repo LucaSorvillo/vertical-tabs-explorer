@@ -83,7 +83,14 @@ replaces two slots in vtables shared by all instances of a class (public WinRT i
 - `NavBar`: the bar (WinUI buttons in the module's island), the **»** overflow list, the group lists, and
   dragging. A drag can move across lists and groups: it is polled with `GetCursorPos`/`GetAsyncKeyState`,
   because WinUI pointer capture belongs to the input site that got the press, and a closed popup drops its
-  input.
+  input. With a list open from the bar, the bar's buttons don't get the pointer (light-dismiss layer), so a
+  16 ms timer (`OnSwitchTimer`) reads the cursor and switches to the group under it. With the tray option
+  **Open groups on mouse hover** (`[NavBar] HoverOpen`), `PointerEntered` on a group of the bar starts a 300 ms
+  timer, and the list opens with `FlyoutShowMode::Transient`: it doesn't take the focus, and WinUI lets the input
+  over the island through to the bar (`OverlayInputPassThroughElement` = the root). The same timer closes it when
+  the cursor stays away from the bar and the lists for 400 ms, on a click elsewhere, or when the window loses the
+  foreground. A press on the group's own button would light-dismiss the list and the click would reopen it: the
+  `Closing` event cancels that close, and a `ShowAt` with `Standard` turns the list into a clicked one.
 - `NavOrder`: moving a pinned folder calls `IAutomaticDestinationList::PinItem`, so Windows' own order (the
   navigation pane, Home, the jump list) is the bar's order read depth-first through the groups.
 - `NavDrop`: folders dragged from outside (File Explorer, the desktop, other apps). The bar's island registers an

@@ -612,6 +612,52 @@ facoltativa e protetta (vedi "Sicurezza della mod").
       tema scuro, `#80F9F9F9` in quello chiaro), rimesso trasparente alla chiusura; se il cursore non è più
       sul pulsante torna anche lo stato visivo "Normal" (con l'elenco aperto il pulsante non sa che il
       puntatore è uscito);
+    - **gruppi al passaggio del mouse** (1.6.0, chiesto dall'utente il 2026-11-21: "un'opzione nella tray
+      disabilitata di default, che consente di aprire i gruppi automaticamente al passaggio del mouse senza
+      cliccare"): voce della tray sotto "Riquadro di spostamento in alto", rientrata e grigia se la barra è
+      spenta, `[NavBar] HoverOpen` in `settings.ini` (la mod la rilegge da sé: `VerticalTabs::Apply` →
+      `NavBar::SetHoverOpen`). Scelte:
+      - si apre restando fermi **300 ms** sul pulsante (`PointerEntered` avvia il timer, `PointerExited` lo
+        ferma): passando soltanto, per esempio dalla vista dei file alla barra degli indirizzi, non si apre.
+        Solo con la finestra in primo piano, senza tasti del mouse premuti, senza elenchi, menu o
+        trascinamenti in corso; "»" resta col clic (l'utente ha chiesto i gruppi);
+      - si apre con `FlyoutShowMode::Transient`, come i sottogruppi: **non prende il fuoco** (chi sta
+      scrivendo nella barra degli indirizzi e passa col mouse sulla barra non si ritrova a scrivere
+      nell'elenco). Nel sorgente di WinUI (`FlyoutBase::UpdateStateToShowMode`) Transient mette anche
+      `m_shouldOverlayPassThroughAllInput`: l'`OverlayInputPassThroughElement` diventa la radice dell'isola, e
+      `PointerInputProcessor::HitTestWithLightDismissAwareness` lascia passare l'input sopra la barra (la
+      pressione chiude comunque l'elenco: `ShouldEventCloseFlyout`). Quindi con un elenco aperto così i pulsanti
+      della barra ricevono il puntatore e i clic: un clic su una cartella della barra la apre e chiude l'elenco
+      in un colpo solo;
+      - si chiude quando il puntatore resta **fuori da barra ed elenchi** (`NearBarOrLevels`, con 16 DIP di
+      margine) per **400 ms**, subito a un clic fuori o se la finestra non è più in primo piano (lo controlla
+      `OnSwitchTimer`, che gira comunque ogni 16 ms con un elenco aperto). Sulla barra resta aperto anche sopra
+      le altre voci, come in Chrome; sugli altri gruppi cambia elenco subito, sempre aperto "passandoci
+      sopra". Non si chiude finché c'è un menu dei gruppi o della barra, il riquadro del nome
+      (`TrackOtherFlyout`) o un menu contestuale;
+      - **clic sul gruppo aperto così**: per WinUI la pressione è un light dismiss (`FlyoutBase_CloseOpenFlyout`)
+      e il clic passa al pulsante, che riaprirebbe l'elenco (con la radice come elemento passante WinUI non
+      chiama `Button_SuppressFlyoutOpening`): si vedrebbe chiudersi e riaprirsi. `Closing` lo annulla
+      (`FlyoutBaseClosingEventArgs::Cancel`, solo se non è una nostra chiusura: `m_hidingLevels`), e l'elenco
+      resta, da lì come aperto col clic: non si chiude più andando via, e un `ShowAt` con `Standard` sullo
+      stesso elenco aperto dallo stesso pulsante cambia solo il modo (`CheckAndHandleOpenFlyout` lo
+      ignora, `UpdateStateToShowMode` no), così torna il light dismiss normale e un altro clic lo chiude.
+      Chiuso col puntatore sul pulsante, non si riapre finché il puntatore non esce e rientra
+      (`m_hoverBlockedKey`);
+      - comandi di prova: `hoveropen <gruppo>` (cursore di prova sul pulsante e "puntatore entrato"), `hover
+      away` (lontano da barra ed elenchi), `hover list` (al centro dell'elenco aperto); il registro dà i
+      millisecondi (apertura dall'entrata, chiusura dall'uscita) e `dump` l'opzione e se gli elenchi aperti
+      sono stati aperti passandoci sopra;
+      - trovato provando: con un elenco già aperto WinUI non apre subito quello nuovo (`CheckAndHandleOpenFlyout`
+      chiude il vecchio e mette il nuovo in attesa, "staged"), quindi `Opening` arriva dopo `ShowAt`. Il segno
+      "aperto passandoci sopra" vale per l'elenco chiesto (`m_hoverOpeningLevel`, per 1 s), non per la durata di
+      `ShowAt`; e fra la chiusura del vecchio e l'apertura del nuovo `OnSwitchTimer` non si ferma. Col mouse vero,
+      scendendo da un elenco fissato col clic sulla riga di un sottogruppo, il sottogruppo si apre 400 ms dopo
+      anche se il puntatore è già uscito (come sempre, anche con l'elenco aperto col clic); con un elenco aperto
+      passandoci sopra, all'uscita il sottogruppo in attesa si annulla (gli elenchi stanno per chiudersi).
+      Prove (2026-11-21): `Test-NavGroups.ps1 -Mouse` 95 su 95 (8 controlli nuovi senza mouse, 7 col mouse vero),
+      `Test-NavBar.ps1` 46 su 46 (portato a Windows in inglese: nomi dei menu con `Ui`, "... items" nella barra di
+      stato; `Send-ModCommand` riprova se la mod ha il file del comando aperto);
     - aggiornamenti: se le voci della barra non cambiano (stesse chiavi, stesso nome e icona) i pulsanti
       restano, e gli elenchi aperti si riempiono di nuovo solo se il loro contenuto è cambiato. L'aspetto di
       un gruppo è solo il nome: il suo contenuto (nel suggerimento, "2 cartelle") si aggiorna sul pulsante che
@@ -911,7 +957,7 @@ delle applicazioni; `dev-windows.txt` (`Enter-VtIsolation` del TestKit) tiene fe
       cambiando il riquadro diventa quella delle schede nuove;
   - finestra stretta e di nuovo larga; barra spenta e riaccesa; schede verticali spente.
   - `-DefineOnly` (con il punto) carica solo le funzioni, per le prove a mano.
-- `Test-NavGroups.ps1`: gruppi della barra (62 controlli, 15 in più con `-Mouse`; `-MouseOnly` fa solo la
+- `Test-NavGroups.ps1`: gruppi della barra (73 controlli, 22 in più con `-Mouse`; `-MouseOnly` fa solo la
   preparazione e i passi col mouse vero, circa 2-3 minuti, per le diagnosi), nella stessa finestra di prova
   isolata. Usa 4
   cartelle di prova (`xpx-pin-1..4`), aggiunte ad Accesso rapido e tolte alla fine (le fissate dell'utente
@@ -931,6 +977,11 @@ delle applicazioni; `dev-windows.txt` (`Enter-VtIsolation` del TestKit) tiene fe
     sono nella barra e non in "»", e alla fine torna al suo posto;
   - aperto col clic (UI Automation), cambiato passandoci sopra e chiuso: il clic sul primo gruppo ne riapre
     l'elenco;
+  - gruppi al passaggio del mouse (`[NavBar] HoverOpen`, scritto in `settings.ini` come fa la tray): spenta,
+    `hoveropen` non apre niente; accesa, l'elenco si apre fra 280 e 650 ms dall'entrata (dal registro),
+    evidenziato e "aperto passandoci sopra"; con `hover list` resta; con `hover` su un altro gruppo cambia
+    entro 60 ms restando "passandoci sopra"; con `hover away` si chiude fra 380 e 750 ms dall'uscita; aperto
+    col clic (UI Automation) invece resta col puntatore lontano; spenta di nuovo, non si apre più;
   - trascinamento guidato dai comandi di prova (`drag`, `dragto` con i punti di UI Automation portati in
     pixel fisici, `dragup`): dall'elenco di un gruppo, fermi su un altro gruppo della barra, si apre il suo
     elenco al posto di quello di partenza e il trascinamento continua staccato; la cartella si lascia sopra la
@@ -962,7 +1013,11 @@ delle applicazioni; `dev-windows.txt` (`Enter-VtIsolation` del TestKit) tiene fe
     un gruppo dentro un altro; Esc annulla; clic destro sul gruppo; il nome scritto con la tastiera
     (Backspace e Invio restano nella casella); con un elenco aperto, passando sopra un altro gruppo si apre
     il suo; trascinando dall'elenco di un gruppo e fermandosi su un altro gruppo della barra si apre il suo, e
-    la cartella si lascia in cima al nuovo elenco.
+    la cartella si lascia in cima al nuovo elenco; con l'opzione "al passaggio del mouse": fermi su un gruppo
+    il suo elenco si apre senza clic e senza togliere il fuoco della tastiera, sull'elenco resta e andando via
+    si chiude; il clic sul gruppo aperto così lo tiene aperto (andando via resta), un altro clic lo chiude e
+    col puntatore ancora sopra non si riapre, uscendo e rientrando sì; clic su una cartella dell'elenco aperto
+    così; spenta, non si apre niente.
   - `-DefineOnly` (con il punto) carica solo le funzioni, per le sonde.
 
   Le altre prove delle schede verticali spengono la barra (`[NavBar] Enabled=0`), così la loro geometria

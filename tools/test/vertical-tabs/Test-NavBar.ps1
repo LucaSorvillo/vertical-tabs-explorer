@@ -210,7 +210,12 @@ function LogCount { (Get-Content $modLog -Encoding UTF8).Count }
 function ModLines([int]$From) { Get-Content $modLog -Encoding UTF8 | Select-Object -Skip $From }
 function Get-Rect([IntPtr]$h) { $r = New-Object NavKit+RECT; [void][NavKit]::GetWindowRect($h, [ref]$r); $r }
 function Send-ModCommand([int64]$Main, [string]$Command) {
-    [IO.File]::WriteAllText((Join-Path $XpxData 'mod-command.txt'), ('{0:x} {1}' -f $Main, $Command), [Text.Encoding]::ASCII)
+    # La mod può avere il file aperto proprio mentre legge il comando di prima: si riprova (al più 2 s)
+    $file = Join-Path $XpxData 'mod-command.txt'
+    for ($i = 0; ; $i++) {
+        try { [IO.File]::WriteAllText($file, ('{0:x} {1}' -f $Main, $Command), [Text.Encoding]::ASCII); break }
+        catch { if ($i -ge 20) { throw }; Start-Sleep -Milliseconds 100 }
+    }
     Start-Sleep -Milliseconds 1200
 }
 # Isole della finestra: intestazione (visibile, senza proprietà), colonna, barra
@@ -428,14 +433,14 @@ function Wait-BarVisible([int64]$Main, [bool]$Visible, [int]$TimeoutMs = 3000) {
 # la barra lo segue (-1 se non lo segue)
 function Switch-NavPane([int64]$Main) {
     $out = [pscustomobject]@{ Before = $null; Ms = -1 }
-    $view = $XAE::FromHandle([IntPtr](Get-HeaderIsland $Main)).FindFirst($XTS::Descendants, (New-Object Windows.Automation.PropertyCondition($XAE::NameProperty, 'Visualizza')))
+    $view = $XAE::FromHandle([IntPtr](Get-HeaderIsland $Main)).FindFirst($XTS::Descendants, (New-Object Windows.Automation.PropertyCondition($XAE::NameProperty, (Ui 'View' 'Visualizza'))))
     $menu = $null
     if (-not $view -or -not $view.TryGetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$menu)) { return $out }
     try {
         $menu.Expand()
-        if (-not (Wait-Until { $script:showItem = Find-MenuItem $Main 'Mostra'; $null -ne $script:showItem } 3000)) { return $out }
+        if (-not (Wait-Until { $script:showItem = Find-MenuItem $Main (Ui 'Show' 'Mostra'); $null -ne $script:showItem } 3000)) { return $out }
         $script:showItem.GetCurrentPattern([Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
-        if (-not (Wait-Until { $script:paneItem = Find-MenuItem $Main 'Riquadro di spostamento'; $null -ne $script:paneItem } 3000)) { return $out }
+        if (-not (Wait-Until { $script:paneItem = Find-MenuItem $Main (Ui 'Navigation pane' 'Riquadro di spostamento'); $null -ne $script:paneItem } 3000)) { return $out }
         $toggle = $script:paneItem.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)
         $out.Before = "$($toggle.Current.ToggleState)"
         $toggle.Toggle()
@@ -536,7 +541,7 @@ try {
     # sinistro; prima, con il contenuto spostato a sinistra della larghezza del riquadro, il testo finiva sotto la colonna
     $status = @(Get-StatusTexts $w)
     $wr = Get-Rect ([IntPtr]$w)
-    Check 'barra di stato: il testo ("... elementi") si vede, dal bordo della colonna' ($status.Count -gt 0 -and $status[0].X -ge $pr.Right -and $status[0].Right -le $wr.Right -and $status[0].Name -match 'element') "$(($status | ForEach-Object { '"{0}" x={1}' -f $_.Name, [int]$_.X }) -join ', '); colonna fino a x=$($pr.Right)"
+    Check 'barra di stato: il testo ("... elementi", "... items") si vede, dal bordo della colonna' ($status.Count -gt 0 -and $status[0].X -ge $pr.Right -and $status[0].Right -le $wr.Right -and $status[0].Name -match 'element|item')"$(($status | ForEach-Object { '"{0}" x={1}' -f $_.Name, [int]$_.X }) -join ', '); colonna fino a x=$($pr.Right)"
 
     # Voci: barra + menu "»" = riquadro nativo, tutte e nello stesso ordine (gli indici dei comandi di prova sono questi)
     $nativeAll = @([NavKit]::NativeNav($c.Tree))
@@ -590,7 +595,7 @@ try {
         $items += for ($i = 0; $i -lt $n; $i++) { $sb = New-Object Text.StringBuilder 128; [void][NavKit]::GetMenuString($hmenu, $i, $sb, 128, 0x400); $sb.ToString() -replace '&', '' }
         [void][NavKit]::PostMessage($m, 0x0100, [IntPtr]0x1B, [IntPtr]::Zero)
     }
-    Check 'menu classico della voce (Apri, Apri in una nuova scheda...)' ($open -and ($items -contains 'Apri in una nuova scheda') -and @($items | Where-Object { $_ }).Count -ge 3) (($items | Where-Object { $_ }) -join ' | ')
+    Check 'menu classico della voce (Apri, Apri in una nuova scheda...)' ($open -and ($items -contains (Ui 'Open in new tab' 'Apri in una nuova scheda')) -and @($items | Where-Object { $_ }).Count -ge 3) (($items | Where-Object { $_ }) -join ' | ')
     Check '  si chiude con Esc' (Wait-Until { [NavKit]::Menus([uint32]$sepPid).Count -eq 0 } 3000)
 
     # --- Riordino delle cartelle aggiunte: 3 cartelle di prova aggiunte in fondo ad Accesso rapido, tolte alla fine
@@ -673,7 +678,8 @@ try {
     }
     # Verbi uguali, salvo quelli propri dell'albero: "rename" (rinomina nell'albero) ed "expandNSC"/"collapseNSC"
     # (Espandi/Comprimi, per le cartelle con sottocartelle); le estensioni (id numerici, diversi fra i due menu) per nome,
-    # salvo "Apri con" di un'estensione installata che a volte non si carica nemmeno fuori da Esplora file.
+    # salvo "Apri con" di un'estensione installata che a volte non si carica nemmeno fuori da Esplora file (il nome è
+    # dell'estensione: in italiano anche con Windows in inglese).
     $verbsOurs = @($ours | Where-Object { $_.Id -notmatch '^\d+$' } | ForEach-Object { $_.Id })
     $verbsNative = @($native | Where-Object { $_.Id -notmatch '^\d+$' -and $_.Id -notmatch '^(rename|expandNSC|collapseNSC)$' } | ForEach-Object { $_.Id })
     $verbsOnlyNative = @($verbsNative | Where-Object { $verbsOurs -notcontains $_ })
@@ -682,7 +688,7 @@ try {
     $extNative = @($native | Where-Object { $_.Id -match '^\d+$' } | ForEach-Object { $_.Name })
     $onlyNative = @($extNative | Where-Object { $extOurs -notcontains $_ })
     $onlyOurs = @($extOurs | Where-Object { $extNative -notcontains $_ })
-    Check '  stesse voci del menu del riquadro di sistema (salvo quelle dell''albero: Rinomina, Espandi)' ($native.Count -gt 0 -and $verbsOnlyNative.Count -eq 0 -and $verbsOnlyOurs.Count -eq 0 -and $onlyOurs.Count -eq 0 -and @($onlyNative | Where-Object { $_ -ne 'Apri con' }).Count -eq 0) "barra $($ours.Count), riquadro $($native.Count); verbi solo nel riquadro: $($verbsOnlyNative -join ', '), solo nella barra: $($verbsOnlyOurs -join ', '); estensioni solo nel riquadro: $($onlyNative -join ', '), solo nella barra: $($onlyOurs -join ', '); rename nel riquadro: $(@($native | Where-Object { $_.Id -eq 'rename' }).Count)"
+    Check '  stesse voci del menu del riquadro di sistema (salvo quelle dell''albero: Rinomina, Espandi)' ($native.Count -gt 0 -and $verbsOnlyNative.Count -eq 0 -and $verbsOnlyOurs.Count -eq 0 -and $onlyOurs.Count -eq 0 -and @($onlyNative | Where-Object { $_ -notin @('Open with', 'Apri con') }).Count -eq 0) "barra $($ours.Count), riquadro $($native.Count); verbi solo nel riquadro: $($verbsOnlyNative -join ', '), solo nella barra: $($verbsOnlyOurs -join ', '); estensioni solo nel riquadro: $($onlyNative -join ', '), solo nella barra: $($onlyOurs -join ', '); rename nel riquadro: $(@($native | Where-Object { $_.Id -eq 'rename' }).Count)"
     # Il menu del riquadro si chiude con "Apri in una nuova scheda" (scheda nuova), NON con "Mostra altre opzioni": nel
     # riquadro di sistema, con il menu classico letto da fuori, chiude Esplora file anche senza la mod.
     $count = (Get-ActivePath $w).Count
@@ -697,7 +703,7 @@ try {
     $open = Wait-Until { $script:menus = @([NavKit]::Menus([uint32]$sepPid)); $script:menus.Count -gt 0 } 5000
     $items = if ($open) { @(Read-ClassicMenu $script:menus[0]) } else { @() }
     foreach ($m in [NavKit]::Menus([uint32]$sepPid)) { [void][NavKit]::PostMessage($m, 0x0100, [IntPtr]0x1B, [IntPtr]::Zero) }
-    Check '  "Mostra altre opzioni": il menu classico (con Nuovo, senza Crea collegamento)' ($open -and $items -contains 'Nuovo' -and $items -contains 'Apri in una nuova scheda' -and $items -notcontains 'Crea collegamento') "$($items.Count) voci"
+    Check '  "Mostra altre opzioni": il menu classico (con Nuovo, senza Crea collegamento)' ($open -and $items -contains (Ui 'New' 'Nuovo') -and $items -contains (Ui 'Open in new tab' 'Apri in una nuova scheda') -and $items -notcontains (Ui 'Create shortcut' 'Crea collegamento')) "$($items.Count) voci"
     Wait-Until { [NavKit]::Menus([uint32]$sepPid).Count -eq 0 } 3000 | Out-Null
     # Menu classico, "Nuovo" > "Cartella": sottomenu e comando del menu "di sfondo", passati dall'unione dei menu
     # (sottomenu aperto con i messaggi del menu, Invio mandato alla sua finestra: nessun input reale)
@@ -706,14 +712,14 @@ try {
     $sub = @()
     if (Wait-Until { $script:menus = @([NavKit]::Menus([uint32]$sepPid)); $script:menus.Count -gt 0 } 5000) {
         $mainMenu = $script:menus[0]
-        $pos = [array]::IndexOf(@(Read-ClassicMenu $mainMenu), 'Nuovo')
+        $pos = [array]::IndexOf(@(Read-ClassicMenu $mainMenu), (Ui 'New' 'Nuovo'))
         if ($pos -ge 0) {
             [void][NavKit]::SendMessage($mainMenu, 0x01E5, [IntPtr]$pos, [IntPtr]::Zero)   # MN_SELECTITEM
             [void][NavKit]::SendMessage($mainMenu, 0x01E3, [IntPtr]::Zero, [IntPtr]::Zero) # MN_OPENHIERARCHY
             if (Wait-Until { $script:menus = @([NavKit]::Menus([uint32]$sepPid)); $script:menus.Count -gt 1 } 4000) {
                 $subWindow = @($script:menus | Where-Object { $_ -ne $mainMenu })[0]
                 $sub = @(Read-ClassicMenu $subWindow)
-                $k = [array]::IndexOf($sub, 'Cartella')
+                $k = [array]::IndexOf($sub, (Ui 'Folder' 'Cartella'))
                 if ($k -ge 0) {
                     [void][NavKit]::SendMessage($subWindow, 0x01E5, [IntPtr]$k, [IntPtr]::Zero)
                     [void][NavKit]::PostMessage($subWindow, 0x0100, [IntPtr]0x0D, [IntPtr]::Zero) # Invio
@@ -723,7 +729,7 @@ try {
     }
     $created = Wait-Until { @(Get-ChildItem -LiteralPath $script:pinPaths[0] -Directory).Count -gt $before } 6000
     foreach ($m in [NavKit]::Menus([uint32]$sepPid)) { [void][NavKit]::PostMessage($m, 0x0100, [IntPtr]0x1B, [IntPtr]::Zero) }
-    Check '  menu classico, "Nuovo" > "Cartella": cartella creata dentro la cartella aggiunta' ($created -and $sub -contains 'Cartella') "sottomenu: $($sub.Count) voci; creata: $created"
+    Check '  menu classico, "Nuovo" > "Cartella": cartella creata dentro la cartella aggiunta' ($created -and $sub -contains (Ui 'Folder' 'Cartella')) "sottomenu: $($sub.Count) voci; creata: $created"
     Wait-Until { [NavKit]::Menus([uint32]$sepPid).Count -eq 0 } 3000 | Out-Null
     Start-Sleep -Milliseconds 800
     # Via le schede aperte dai menu (sulla cartella di prova): la striscia delle schede torna com'era per le prove dopo

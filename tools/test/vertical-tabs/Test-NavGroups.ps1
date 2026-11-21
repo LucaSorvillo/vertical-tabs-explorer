@@ -52,12 +52,14 @@ function Invoke-Element($Element) { $Element.GetCurrentPattern([Windows.Automati
 function Get-GroupDump([int64]$Main) {
     $from = LogCount
     Send-AndWait $Main 'navbar group dump'
-    $out = [pscustomobject]@{ Top = ''; Open = ''; Groups = @{}; Lit = ''; Animations = ''; Tips = @{} }
+    $out = [pscustomobject]@{ Top = ''; Open = ''; Groups = @{}; Lit = ''; Animations = ''; Tips = @{}; HoverOption = ''; HoverOpened = '' }
     foreach ($l in @(ModLines $from | Where-Object { $_ -match "\[\s*$sepPid\:.*NavBar\[gruppi\]: " } | ForEach-Object { $_ -replace '^.*NavBar\[gruppi\]: ', '' })) {
         if ($l -match '^primo livello: (.*)\.$') { $out.Top = (@($Matches[1] -split ', ' | Where-Object { $_ -and $_ -ne 'f:*' }) -join ',') }
         elseif ($l -match '^elenchi aperti: (.*)\.$') { $out.Open = $Matches[1] }
         # pulsanti della barra evidenziati (elenco aperto) e animazioni dell'elenco aperto ("sì", "no", "-")
         elseif ($l -match '^evidenziati: (.*); animazioni dell.elenco aperto: (.*)\.$') { $out.Lit = $Matches[1]; $out.Animations = $Matches[2] }
+        # opzione "al passaggio del mouse" e se gli elenchi aperti sono stati aperti così ("sì", "no", "-" = nessuno aperto)
+        elseif ($l -match '^al passaggio del mouse: (.*); elenchi aperti passandoci sopra: (.*)\.$') { $out.HoverOption = $Matches[1]; $out.HoverOpened = $Matches[2] }
         # suggerimenti dei gruppi della barra (il contenuto, come è sul pulsante): "g:nome = 2 cartelle; ..."
         elseif ($l -match '^suggerimenti: (.*)\.$' -and $Matches[1] -ne 'nessuno') { foreach ($pair in ($Matches[1] -split '; ')) { $kv = $pair -split ' = ', 2; if ($kv.Count -eq 2) { $out.Tips[$kv[0]] = $kv[1] } } }
         elseif ($l -match '^g:(.+?) = \[(.*)\]\.$') { $out.Groups[$Matches[1]] = ($Matches[2] -replace ', ', ',') }
@@ -383,6 +385,69 @@ try {
     Send-Group $w 'place g:xpxE|-|-'
     $d = Get-GroupDump $w
     Check '  xpxE rimesso in fondo al blocco: ordine come prima del blocco' ($d.Top -eq $topBeforeHover) "$(Format-Dump $d) (prima [$topBeforeHover])"
+
+    "--- gruppi al passaggio del mouse (opzione della tray, spenta di norma)"
+    # Senza mouse: "hoveropen <gruppo>" mette il cursore di prova sul pulsante del gruppo e fa come il puntatore che ci entra
+    # (PointerEntered); "hover away" lo porta lontano da barra ed elenchi, "hover list" al centro dell'elenco aperto. I tempi
+    # dal registro della mod: l'elenco si apre 300 ms dopo l'entrata, si chiude 400 ms dopo l'uscita. L'opzione la legge la
+    # mod da settings.ini (la tray la scrive lì); le finestre dell'utente non la vedono (isolate).
+    $topBeforeHoverOpen = (Get-GroupDump $w).Top
+    Send-Group $w 'place g:xpxE|-|^'
+    $info = Get-BarInfo $w
+    $d = Get-GroupDump $w
+    $bothOnBar = ($info.Groups -contains $info.First) -and ($info.Groups -contains ($info.First + 1)) -and ($info.First + 1) -lt $info.Visible
+    Check 'per la prova: xpxE e xpxA nella barra; opzione spenta (com''è di norma)' ($bothOnBar -and $d.Top -like 'g:xpxE,g:xpxA,*' -and $d.HoverOption -eq 'no') "$(Format-Dump $d); al passaggio del mouse: $($d.HoverOption)"
+    Send-Group $w 'hoveropen xpxA'
+    Start-Sleep -Milliseconds 900
+    $d = Get-GroupDump $w
+    Check 'opzione spenta: fermi su un gruppo della barra, nessun elenco si apre' ($d.Open -eq 'nessuno' -and @(Get-Popups $w).Count -eq 0) "aperti: $($d.Open); $(Format-Popups $w)"
+    Send-Group $w 'hover off'
+    $before = LogCount
+    Set-XpxOption 'NavBar' 'HoverOpen' '1'
+    $applied = Wait-Until { (ModLines $before) -match "\[\s*$sepPid\:.*gruppi aperti al passaggio del mouse: sì" } 6000
+    Check 'opzione accesa (settings.ini, come dal menu della tray): la barra della finestra di prova la prende' $applied
+    $from = LogCount
+    Send-Group $w 'hoveropen xpxA'
+    $ok = Wait-Until { Test-PopupList $w 'xpx-pin-1,xpx-pin-2,xpxB' } 3000
+    $line = "$(@(ModLines $from | Where-Object { $_ -match "\[\s*$sepPid\:.*elenco aperto passandoci sopra \(prova\), \d+ ms" }) | Select-Object -First 1)"
+    $ms = if ($line -match '\(prova\), (\d+) ms') { [int]$Matches[1] } else { -1 }
+    $d = Get-GroupDump $w
+    Check '  fermi sul gruppo della barra: il suo elenco si apre senza clic, dopo 0,3 s, evidenziato' ($ok -and $ms -ge 280 -and $ms -le 650 -and $d.Open -eq 'g:xpxA' -and $d.HoverOpened -eq 'sì' -and $d.Lit -eq 'g:xpxA') "aperto $ms ms dopo l'entrata; aperti: $($d.Open); passandoci sopra: $($d.HoverOpened); evidenziati: $($d.Lit)"
+    Send-Group $w 'hover list'
+    Start-Sleep -Milliseconds 1000
+    $d = Get-GroupDump $w
+    Check '  col puntatore sull''elenco resta aperto' ($d.Open -eq 'g:xpxA' -and $d.HoverOpened -eq 'sì') "aperti: $($d.Open)"
+    $r = & $hover 'xpxE' 'g:xpxE'
+    Check '  sul pulsante di un altro gruppo si apre subito il suo, sempre aperto passandoci sopra' ($r.Switched -and $r.Ms -ge 0 -and $r.Ms -le 60 -and $r.Dump.HoverOpened -eq 'sì' -and $r.Dump.Lit -eq 'g:xpxE') "cambiato $($r.Ms) ms dopo il comando; aperti: $($r.Dump.Open); passandoci sopra: $($r.Dump.HoverOpened); evidenziati: $($r.Dump.Lit)"
+    $from = LogCount
+    Send-Group $w 'hover away'
+    $closed = Wait-Until { @(Get-Popups $w).Count -eq 0 } 3000
+    $line = "$(@(ModLines $from | Where-Object { $_ -match "\[\s*$sepPid\:.*elenchi aperti passandoci sopra chiusi \(prova\): il puntatore .+, \d+ ms" }) | Select-Object -First 1)"
+    $ms = if ($line -match ', (\d+) ms dopo') { [int]$Matches[1] } else { -1 }
+    $d = Get-GroupDump $w
+    Check '  col puntatore lontano da barra ed elenchi si chiude, dopo 0,4 s; nessun gruppo evidenziato' ($closed -and $ms -ge 380 -and $ms -le 750 -and $d.Open -eq 'nessuno' -and $d.Lit -eq 'nessuno') "chiuso $ms ms dopo l'uscita; aperti: $($d.Open); evidenziati: $($d.Lit)"
+    Send-Group $w 'hover off'
+    $ba = Find-BarButton $w 'xpxA'
+    if ($ba) { Invoke-Element $ba }
+    $okA = Wait-Until { (Get-GroupDump $w).Open -eq 'g:xpxA' } 3000
+    Send-Group $w 'hover away'
+    Start-Sleep -Milliseconds 1200
+    $d = Get-GroupDump $w
+    Check '  aperto col clic (opzione accesa): resta aperto con il puntatore lontano, come prima' ($ba -and $okA -and $d.Open -eq 'g:xpxA' -and $d.HoverOpened -eq 'no') "aperti: $($d.Open); passandoci sopra: $($d.HoverOpened)"
+    Send-Group $w 'hover off'
+    Send-ModCommand $w 'navbar closemenu'
+    Wait-Until { @(Get-Popups $w).Count -eq 0 } 3000 | Out-Null
+    $before = LogCount
+    Set-XpxOption 'NavBar' 'HoverOpen' '0'
+    Wait-Until { (ModLines $before) -match "\[\s*$sepPid\:.*gruppi aperti al passaggio del mouse: no" } 6000 | Out-Null
+    Send-Group $w 'hoveropen xpxA'
+    Start-Sleep -Milliseconds 900
+    $d = Get-GroupDump $w
+    Check '  opzione spenta di nuovo: fermi sul gruppo non si apre più' ($d.Open -eq 'nessuno' -and $d.HoverOption -eq 'no') "aperti: $($d.Open); al passaggio del mouse: $($d.HoverOption)"
+    Send-Group $w 'hover off'
+    Send-Group $w 'place g:xpxE|-|-'
+    $d = Get-GroupDump $w
+    Check '  xpxE rimesso in fondo al blocco: ordine come prima' ($d.Top -eq $topBeforeHoverOpen) "$(Format-Dump $d) (prima [$topBeforeHoverOpen])"
 
     "--- trascinando dall'elenco di un gruppo, fermi su un altro gruppo della barra: si apre il suo (come Chrome)"
     # Senza mouse: "drag <voce>" comincia un trascinamento vero (timer, elenchi che si aprono restando fermi, stacco
@@ -812,6 +877,95 @@ try {
             @(ModLines $from | Where-Object { $_ -match "\[\s*$sepPid\:.*(NavBar\[trascinamento\]|NavBar: (trascinamento|si apre|voce|cartella|gruppo))" } | Select-Object -First 30) | ForEach-Object { '    ' + ($_ -replace '^2026-\d\d-\d\d ', '') }
         }
         Send-ModCommand $w 'navbar closemenu'
+        Wait-Until { @(Get-Popups $w).Count -eq 0 } 3000 | Out-Null
+        # 14) Opzione "al passaggio del mouse": fermi su un gruppo della barra (senza clic) il suo elenco si apre, senza prendere
+        #     il fuoco della tastiera; sull'elenco resta; andando via (lontano da barra ed elenchi, nella vista dei file) si chiude
+        $win = $XAE::FromHandle([IntPtr]$w).Current.BoundingRectangle
+        $away = @([int]($win.X + $win.Width * 0.6), [int]($win.Y + $win.Height * 0.8))
+        $before = LogCount
+        Set-XpxOption 'NavBar' 'HoverOpen' '1'
+        Wait-Until { (ModLines $before) -match "\[\s*$sepPid\:.*gruppi aperti al passaggio del mouse: sì" } 6000 | Out-Null
+        [void][NavMouse]::SetForegroundWindow([IntPtr]$w); Start-Sleep -Milliseconds 300
+        $bc = Find-BarButton $w 'xpxC'
+        $opened = $false; $stayed = $false; $closedAway = $false; $focusBefore = ''; $focusAfter = ''
+        if ($bc) {
+            Move-To $away[0] $away[1] 12; Hold $away[0] $away[1] 300
+            $focusBefore = Get-FocusedName
+            $p = Center $bc
+            Glide $away[0] $away[1] $p[0] $p[1] 15; Hold $p[0] $p[1] 800
+            $d = Get-GroupDump $w
+            $opened = $d.Open -eq 'g:xpxC' -and $d.HoverOpened -eq 'sì' -and @(Get-Popups $w).Count -ge 1
+            $focusAfter = Get-FocusedName
+            $firstRow = @(Get-Popups $w | ForEach-Object { Get-PopupButtons $_ }) | Select-Object -First 1
+            if ($firstRow) { $q = Center $firstRow; Glide $p[0] $p[1] $q[0] $q[1] 10; Hold $q[0] $q[1] 1000; $stayed = (Get-GroupDump $w).Open -eq 'g:xpxC' }
+            Glide $script:LastCursor.X $script:LastCursor.Y $away[0] $away[1] 15; Hold $away[0] $away[1] 1000
+            $closedAway = @(Get-Popups $w).Count -eq 0 -and (Get-GroupDump $w).Open -eq 'nessuno'
+        }
+        Check 'mouse: opzione accesa, fermi su un gruppo della barra il suo elenco si apre senza clic' ($bc -and $opened) "aperti: $((Get-GroupDump $w).Open)"
+        Check '  la tastiera resta dov''era (l''elenco non prende il fuoco)' ($focusBefore -and $focusAfter -eq $focusBefore) "fuoco prima: $($focusBefore -replace '\|.*$', ''), dopo: $($focusAfter -replace '\|.*$', '')"
+        Check '  col puntatore sull''elenco resta aperto; andando via si chiude' ($stayed -and $closedAway) "resta: $stayed; chiuso andando via: $closedAway"
+        # 15) Aperto passandoci sopra, il clic sul gruppo lo tiene aperto (da lì come aperto col clic: andando via resta); un
+        #     altro clic lo chiude e, col puntatore ancora sopra, non si riapre finché non si esce e si rientra
+        [void][NavMouse]::SetForegroundWindow([IntPtr]$w); Start-Sleep -Milliseconds 300
+        $hoverFirst = $false; $pinned = $false; $stayedAway = $false; $closedByClick = $false; $staysClosed = $false; $reopened = $false
+        $bc = Find-BarButton $w 'xpxC'
+        if ($bc) {
+            $p = Center $bc
+            Glide $script:LastCursor.X $script:LastCursor.Y $p[0] $p[1] 15; Hold $p[0] $p[1] 800
+            $hoverFirst = (Get-GroupDump $w).HoverOpened -eq 'sì'
+            if ($hoverFirst) {
+                Mouse-Click; Start-Sleep -Milliseconds 500
+                $d = Get-GroupDump $w
+                $pinned = $d.Open -eq 'g:xpxC' -and $d.HoverOpened -eq 'no' -and @(Get-Popups $w).Count -ge 1
+                # (scendendo si passa sulle righe dell'elenco: fermi un attimo sul sottogruppo, si apre anche lui, come col clic)
+                Glide $p[0] $p[1] $away[0] $away[1] 15; Hold $away[0] $away[1] 1000
+                $stayedAway = (Get-GroupDump $w).Open -like 'g:xpxC*'
+                Glide $away[0] $away[1] $p[0] $p[1] 15; Hold $p[0] $p[1] 300
+                Mouse-Click
+                $closedByClick = Wait-Until { @(Get-Popups $w).Count -eq 0 } 2000
+                Hold $p[0] $p[1] 900
+                $staysClosed = (Get-GroupDump $w).Open -eq 'nessuno'
+                Glide $p[0] $p[1] $away[0] $away[1] 10; Hold $away[0] $away[1] 300
+                Glide $away[0] $away[1] $p[0] $p[1] 10; Hold $p[0] $p[1] 800
+                $d = Get-GroupDump $w
+                $reopened = $d.Open -eq 'g:xpxC' -and $d.HoverOpened -eq 'sì'
+                Glide $p[0] $p[1] $away[0] $away[1] 15; Hold $away[0] $away[1] 1000
+            }
+        }
+        Check 'mouse: aperto passandoci sopra, il clic sul gruppo lo tiene aperto (andando via resta)' ($hoverFirst -and $pinned -and $stayedAway) "aperto passandoci sopra: $hoverFirst; tenuto dal clic: $pinned; resta andando via: $stayedAway"
+        Check '  un altro clic lo chiude; col puntatore ancora sopra non si riapre, uscendo e rientrando sì' ($closedByClick -and $staysClosed -and $reopened) "chiuso: $closedByClick; resta chiuso: $staysClosed; riaperto: $reopened; $(Format-Popups $w)"
+        # 16) Aperto passandoci sopra, clic su una cartella dell'elenco: si apre nella scheda attiva e l'elenco si chiude
+        [void][NavMouse]::SetForegroundWindow([IntPtr]$w); Start-Sleep -Milliseconds 300
+        Wait-Until { @(Get-Popups $w).Count -eq 0 } 2000 | Out-Null
+        $hoverList = $false; $okFolder = $false
+        $bc = Find-BarButton $w 'xpxC'
+        if ($bc) {
+            $p = Center $bc
+            Glide $script:LastCursor.X $script:LastCursor.Y $p[0] $p[1] 15; Hold $p[0] $p[1] 800
+            $hoverList = (Get-GroupDump $w).HoverOpened -eq 'sì'
+            $row = Find-PopupElement $w ([Windows.Automation.ControlType]::Button) 'xpx-pin-4'
+            if ($hoverList -and $row) {
+                $q = Center $row; Glide $p[0] $p[1] $q[0] $q[1] 10; Hold $q[0] $q[1] 200; Mouse-Click
+                $okFolder = (Wait-Until { (Get-ActivePath $w).Paths -contains $script:pinPaths[3] } 5000) -and (Wait-Until { @(Get-Popups $w).Count -eq 0 } 3000)
+            }
+            Start-Sleep -Milliseconds 800
+        }
+        Check 'mouse: aperto passandoci sopra, clic su una cartella dell''elenco: si apre nella scheda attiva, elenco chiuso' ($hoverList -and $okFolder) "aperto passandoci sopra: $hoverList; $(Format-Popups $w)"
+        # 17) Opzione spenta di nuovo: fermi sul gruppo non si apre niente
+        $before = LogCount
+        Set-XpxOption 'NavBar' 'HoverOpen' '0'
+        Wait-Until { (ModLines $before) -match "\[\s*$sepPid\:.*gruppi aperti al passaggio del mouse: no" } 6000 | Out-Null
+        [void][NavMouse]::SetForegroundWindow([IntPtr]$w); Start-Sleep -Milliseconds 300
+        $noOpen = $false
+        $bc = Find-BarButton $w 'xpxC'
+        if ($bc) {
+            $p = Center $bc
+            Glide $script:LastCursor.X $script:LastCursor.Y $away[0] $away[1] 10; Hold $away[0] $away[1] 300
+            Glide $away[0] $away[1] $p[0] $p[1] 15; Hold $p[0] $p[1] 900
+            $noOpen = (Get-GroupDump $w).Open -eq 'nessuno' -and @(Get-Popups $w).Count -eq 0
+            Glide $p[0] $p[1] $away[0] $away[1] 10
+        }
+        Check 'mouse: opzione spenta, fermi sul gruppo non si apre niente' ($bc -and $noOpen) "aperti: $((Get-GroupDump $w).Open)"
       }
       catch {
         if ("$_" -notlike 'GUARDIA:*') { throw }

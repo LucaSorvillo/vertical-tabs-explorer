@@ -1048,8 +1048,8 @@ namespace xpx::mod
                 }
                 if (changed)
                 {
-                    XPX_MLOG(L"Impostazioni cambiate: schede verticali %s, barra delle cartelle %s, larghezza %d.", loaded.verticalTabs ? L"sì" : L"no",
-                             loaded.navBar ? L"sì" : L"no", loaded.width);
+                    XPX_MLOG(L"Impostazioni cambiate: schede verticali %s, barra delle cartelle %s (gruppi al passaggio del mouse %s), larghezza %d.",
+                             loaded.verticalTabs ? L"sì" : L"no", loaded.navBar ? L"sì" : L"no", loaded.navBarHoverOpen ? L"sì" : L"no", loaded.width);
                     ApplySettingsToAllWindows();
                 }
             }
